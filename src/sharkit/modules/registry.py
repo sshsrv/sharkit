@@ -42,6 +42,18 @@ class ModuleRegistry:
             or lower_query in module.metadata.description.lower()
         ]
 
+    def find_modules(self, query: str) -> list[tuple[str, ModuleMetadata]]:
+        lower_query = query.lower()
+        results: list[tuple[str, ModuleMetadata]] = []
+        for path, cls in self.get_all_modules().items():
+            metadata = cls.metadata
+            searchable = (
+                f"{metadata.name} {metadata.description} {metadata.category} {path}".lower()
+            )
+            if lower_query in searchable:
+                results.append((path, metadata))
+        return results
+
     def get_modules_by_category(self, category: str) -> list[ModuleMetadata]:
         lower_category = category.lower()
         return [
