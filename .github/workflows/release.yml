@@ -18,6 +18,8 @@ jobs:
       contents: read
     outputs:
       devver: ${{ steps.devver.outputs.version }}
+      devtag: ${{ steps.devver.outputs.devtag }}
+      shortsha: ${{ steps.sha.outputs.shortsha }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -40,9 +42,15 @@ jobs:
             | sort -n | tail -1) || true
           N=$(( ${N:-0} + 1 ))
           DEVVER="${BASE}.dev${N}"
+          DEVTAG="dev${N}"
           echo "Dev version: $DEVVER"
           echo "version=$DEVVER" >> "$GITHUB_OUTPUT"
+          echo "devtag=$DEVTAG" >> "$GITHUB_OUTPUT"
           sed -i -E "s/^version = \".*\"/version = \"$DEVVER\"/" pyproject.toml
+
+      - name: Compute short SHA
+        id: sha
+        run: echo "shortsha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
 
       - name: Build
         run: uv build
@@ -91,5 +99,5 @@ jobs:
           tag_name: ${{ github.ref == 'refs/heads/dev' && format('v{0}', needs.build.outputs.devver) || github.ref_name }}
           name: ${{ github.ref == 'refs/heads/dev' && format('v{0}', needs.build.outputs.devver) || github.ref_name }}
           target_commitish: ${{ github.sha }}
+          body: ${{ github.ref == 'refs/heads/dev' && format('Automated dev pre-release ({0}) built from commit {1}', needs.build.outputs.devtag, needs.build.outputs.shortsha) || format('Automated stable release ({0}) built from commit {1}', github.ref_name, needs.build.outputs.shortsha) }}
           prerelease: ${{ github.ref == 'refs/heads/dev' }}
-          generate_release_notes: true
