@@ -63,6 +63,7 @@ jobs:
       name: pypi
     permissions:
       id-token: write
+      contents: write
     steps:
       - name: Install uv
         uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
@@ -78,5 +79,14 @@ jobs:
       - name: Generate PEP 740 attestations
         uses: astral-sh/attest-action@f589a42a7efb6fe400b4f400de60b4bc90390027 # v0.0.6
 
-      - name: Publish
-        run: uv publish
+        - name: Publish
+          run: uv publish
+
+        - name: Create GitHub Release
+          uses: softprops/action-gh-release@v2
+          with:
+            files: dist/*
+            tag_name: ${{ github.ref == 'refs/heads/dev' && format('v{0}', steps.devver.outputs.version) || github.ref_name }}
+            name: ${{ github.ref == 'refs/heads/dev' && format('v{0}', steps.devver.outputs.version) || github.ref_name }}
+            prerelease: ${{ github.ref == 'refs/heads/dev' }}
+            generate_release_notes: true
