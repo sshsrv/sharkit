@@ -90,5 +90,6 @@ jobs:
           files: dist/*
           tag_name: ${{ github.ref == 'refs/heads/dev' && format('v{0}', needs.build.outputs.devver) || github.ref_name }}
           name: ${{ github.ref == 'refs/heads/dev' && format('v{0}', needs.build.outputs.devver) || github.ref_name }}
+          target_commitish: ${{ github.sha }}
           prerelease: ${{ github.ref == 'refs/heads/dev' }}
           generate_release_notes: true
