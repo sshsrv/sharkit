@@ -110,19 +110,48 @@ class StatusCommand(Command):
 class UseCommand(Command):
     name = "use"
     aliases = []
-    description = "Select a module"
-    usage = "use <module_path>"
+    description = "Select a module by name, search query, or index (msfconsole-style)"
+    usage = "use <query|index>"
 
     def execute(self, context: CommandContext, args: list[str]) -> str | None:
         valid, error = self.validate_args(args)
         if not valid:
             return error
-        module_path = args[0]
+        token = args[0]
         module_registry = context.session.get("module_registry")
-        if module_registry is not None and module_registry.get_module(module_path) is None:
-            return f'Module "{module_path}" not found.\nTry: search {module_path}'
-        context.current_module = module_path
-        return f'Module "{module_path}" selected.'
+        if module_registry is None:
+            return "Module registry not available."
+
+        if token.isdigit():
+            matches = context.session.get("use_matches")
+            if not matches:
+                return 'No module selection in progress. Use "use <query>" to search first.'
+            index = int(token)
+            if index < 0 or index >= len(matches):
+                return f"Invalid module index: {index}"
+            context.current_module = matches[index]
+            return f'Module "{matches[index]}" selected.'
+
+        query = token.lower()
+        matches = module_registry.find_modules(query)
+        if not matches:
+            return f'No modules found matching "{token}".\nTry: search {token}'
+
+        paths = [path for path, _ in matches]
+        context.session["use_matches"] = paths
+
+        renderer = context.session.get("renderer")
+        if renderer is not None:
+            rows = [
+                [str(i), path, metadata.description]
+                for i, (path, metadata) in enumerate(matches)
+            ]
+            renderer.table(f"use > {token}", ["#", "Module", "Description"], rows)
+
+        if len(matches) == 1:
+            context.current_module = paths[0]
+            return f'Module "{paths[0]}" selected.'
+        return 'Select a module by index, e.g. "use 0".'
 
     def validate_args(self, args: list[str]) -> tuple[bool, str | None]:
         if not args:

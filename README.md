@@ -1,96 +1,63 @@
-# sharkit
+<div align="center"><img width="640" height="347" alt="banner" src="https://github.com/user-attachments/assets/c027fb38-fe0f-4baa-b35f-597f9f8cf39b" /></div>
 
-OSINT / HUMINT / GEOINT research framework — a modular CLI for gathering and correlating
-open-source intelligence from the terminal.
+<div align="center">
+  
+![PyPI](https://img.shields.io/pypi/v/sharkit?labelColor=000000&color=ff5faf&style=flat)
+![Python](https://img.shields.io/pypi/pyversions/sharkit?labelColor=000000&color=ff5faf&style=flat)
+![License](https://img.shields.io/pypi/l/sharkit?labelColor=000000&color=ff5faf&style=flat)
+![CI](https://img.shields.io/github/actions/workflow/status/sshsrv/sharkit/ci.yml?labelColor=000000&color=ff5faf&style=flat)
 
-> Built for Linux. Runs anywhere Python 3.11+ runs — including **Termux on Android**.
+</div>
 
-## Requirements
+> [!IMPORTANT]  
+> sharkit is intended for lawful OSINT research, authorized security testing, education, and legitimate investigations. You are responsible for complying with applicable laws, permissions, and terms of service.
+> 
+> sharkit does not guarantee anonymity.
+#
 
-- Python >= 3.11
-- `pip` or `uv`
+### Features
+- A terminal framework for OSINT / HUMINT / GEOINT work.
+- Modules expose a `run` method, options, and metadata; the shell loads them as you need them.
+- 15 built-in commands: `use`, `run`, `set`, `search`, `history`, `clear`, `exit`, and a few more.
+- Ships with two example modules: `testing/demo/echo` and `testing/http/metadata`.
+- `sharkit --version` shows the exact build you have, dev pre-releases included.
+- State lives in `~/.config/sharkit` and runs fine on Termux / Android.
+- To wipe it completely: `uv tool uninstall sharkit` and `rm -rf ~/.config/sharkit`.
+#
 
-## Installation
-
-From PyPI:
-
-```bash
-pip install sharkit
-```
-
-Or with `uv`:
-
+### sharkit management on Linux using uv (RECOMMENDED)
+- Install
 ```bash
 uv tool install sharkit
 ```
-
-Then launch the interactive shell:
-
+- Upgrade
 ```bash
-sharkit
+uv tool upgrade sharkit
 ```
-
-## Termux / Android
-
-sharkit is pure Python (no compiled extensions) and depends only on `prompt_toolkit`
-and `httpx`, so it installs and runs on Termux without any native build step.
-
+- Uninstall
 ```bash
-pkg update && pkg install python
+uv tool uninstall sharkit
+rm -rf ~/.config/sharkit
+```
+<br>
+
+### sharkit management on Linux using pip
+- Install
+```bash
 pip install sharkit
-sharkit
 ```
-
-If Termux's Python is marked *externally managed*, install into a virtual environment:
-
+- Upgrade
 ```bash
-pkg install python
-python -m venv ~/sharkit-venv
-~/sharkit-venv/bin/pip install sharkit
-~/sharkit-venv/bin/sharkit
+pip install --upgrade sharkit
 ```
-
-- Configuration, history and cache live under `~/.config/sharkit`
-  (on Android: `/data/data/com.termux/files/home/.config/sharkit`).
-- Network access uses the standard Termux permission — no extra setup required.
-- The UI relies on ANSI escape codes and Unicode box-drawing, which Termux's
-  terminal renders natively.
-
-## Quick start
-
-```
-sharkit                      # start the interactive shell
-help                        # list commands
-use testing/demo/echo       # load a module
-set message "hello"         # configure an option
-run                         # execute the active module
-history                     # show command history
-clear                       # clear the screen
-exit                        # quit
-```
-
-Available commands: `help`, `banner`, `version`, `status`, `use`, `back`, `info`,
-`show`, `set`, `unset`, `run`, `search`, `history`, `clear`, `exit`.
-
-## Modules
-
-Modules are discovered automatically from the packaged `sharkit/modules` directory:
-
-- `testing/demo/echo` — echo module for testing the framework
-- `testing/http/metadata` — HTTP metadata gathering (status, headers, content type, …)
-
-## Development
-
+- Uninstall
 ```bash
-git clone https://github.com/sshsrv/sharkit
-cd sharkit
-uv sync --all-groups
-uv run sharkit
+pip uninstall sharkit
+rm -rf ~/.config/sharkit
 ```
+#
 
-Quality gates: `uv run ruff check .`, `uv run mypy src/`, `uv run pytest -q`.
-
-## Disclaimer
-
-sharkit is a research tool. Use it responsibly and in accordance with applicable law
-and the terms of service of any system you interact with.
+### Links
+- PyPI: https://pypi.org/project/sharkit/
+- GitHub: https://github.com/sshsrv/sharkit
+- Releases: https://github.com/sshsrv/sharkit/releases
