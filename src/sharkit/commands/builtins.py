@@ -675,9 +675,8 @@ class InstallCommand(Command):
                 renderer.log_line(tag, msg, color=GREEN)
             else:
                 lines = msg.splitlines() or [""]
-                renderer.gutter(tag, lines[0], GREEN, is_first=False)
-                for line in lines[1:]:
-                    print(f"{GREEN}{BOLD}│{RESET} {line}")
+                for line in lines:
+                    renderer.gutter(tag, line, GREEN, is_first=False)
             return None
         return str(message)
 
@@ -740,9 +739,8 @@ class UpgradeCommand(Command):
                 renderer.log_line(tag, msg, color=BLUE)
             else:
                 lines = msg.splitlines() or [""]
-                renderer.gutter(tag, lines[0], BLUE, is_first=False)
-                for line in lines[1:]:
-                    print(f"{BLUE}{BOLD}│{RESET} {line}")
+                for line in lines:
+                    renderer.gutter(tag, line, BLUE, is_first=False)
             return None
         return str(message)
 
@@ -804,9 +802,8 @@ class UpgradeCommand(Command):
                     renderer.log_line(tag, msg, color=BLUE)
                 else:
                     lines = msg.splitlines() or [""]
-                    renderer.gutter(tag, lines[0], BLUE, is_first=False)
-                    for line in lines[1:]:
-                        print(f"{BLUE}{BOLD}│{RESET} {line}")
+                    for line in lines:
+                        renderer.gutter(tag, line, BLUE, is_first=False)
         return None
 
 
