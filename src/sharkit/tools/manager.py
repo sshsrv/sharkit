@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from sharkit.exceptions import ToolError
 from sharkit.tools.base import ToolInstallSpec
 
 
@@ -20,7 +21,12 @@ class ToolManager:
         return self._root
 
     def install_path(self, name: str) -> Path:
-        return self._root / name
+        if not name or "/" in name or "\\" in name or name.startswith("."):
+            raise ToolError(f"Invalid tool name: {name!r}")
+        resolved = (self._root / name).resolve()
+        if not str(resolved).startswith(str(self._root.resolve())):
+            raise ToolError(f"Tool name escapes install root: {name!r}")
+        return resolved
 
     def is_installed(self, name: str) -> bool:
         return (self.install_path(name) / ".installed").exists()
@@ -33,11 +39,12 @@ class ToolManager:
         venv_dir = dest / "venv"
         try:
             dest.mkdir(parents=True, exist_ok=True)
-            if repo_dir.exists():
-                shutil.rmtree(repo_dir)
-            if on_progress:
-                on_progress("cloning repository...")
-            self._run(["git", "clone", "--depth", "1", spec.git_url, str(repo_dir)])
+            if spec.git_url:
+                if repo_dir.exists():
+                    shutil.rmtree(repo_dir)
+                if on_progress:
+                    on_progress("cloning repository...")
+                self._run(["git", "clone", "--depth", "1", spec.git_url, str(repo_dir)])
             if spec.venv:
                 if on_progress:
                     on_progress("creating virtual environment...")
@@ -101,8 +108,15 @@ class ToolManager:
         except Exception as e:
             return False, f'Failed to uninstall "{name}": {e}'
 
-    def _run(self, cmd: list[str]) -> None:
-        result = subprocess.run(cmd, capture_output=True, text=True)
+    def _run(self, cmd: list[str], *, timeout: int = 120) -> None:
+        try:
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, timeout=timeout
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError(
+                f"Command timed out after {timeout}s: {' '.join(cmd[:3])}"
+            ) from exc
         if result.returncode != 0:
             stderr = result.stderr.strip() if result.stderr else ""
             stdout = result.stdout.strip() if result.stdout else ""

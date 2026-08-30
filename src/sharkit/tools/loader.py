@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import inspect
+import logging
 import sys
 from pathlib import Path
 
@@ -48,7 +49,10 @@ def _import_file(file_path: Path) -> object | None:
         sys.modules[tool_name] = tool
         spec.loader.exec_module(tool)
         return tool
-    except Exception:
+    except Exception as exc:
+        logging.getLogger(__name__).warning(
+            "Failed to load tool %s: %s", file_path, exc
+        )
         sys.modules.pop(tool_name, None)
         return None
 

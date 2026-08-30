@@ -9,7 +9,6 @@ import select
 import struct
 import subprocess
 import termios
-from dataclasses import replace
 
 from sharkit.output.theme import PINK, hex_to_ansi
 from sharkit.tools.base import (
@@ -99,11 +98,6 @@ class SherlockTool(Tool):
 
     def get_options(self) -> dict[str, OptionDefinition]:
         return self._options
-
-    def set_option(self, key: str, value: str) -> None:
-        if key not in self._options:
-            raise ValueError(f'Option "{key}" not found.')
-        self._options[key] = replace(self._options[key], value=value)
 
     def execute(self, context: ExecutionContext) -> Result:
         from sharkit.tools.manager import ToolManager
@@ -230,7 +224,12 @@ class SherlockTool(Tool):
                         current += ch
         except KeyboardInterrupt:
             with contextlib.suppress(OSError):
-                proc.kill()
+                proc.terminate()  # SIGTERM first
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                with contextlib.suppress(OSError):
+                    proc.kill()  # SIGKILL as fallback
             current = ""
             if renderer is not None:
                 print("\r\033[K", end="")
@@ -246,7 +245,11 @@ class SherlockTool(Tool):
                     print(_clean_ansi(current))
             with contextlib.suppress(OSError):
                 os.close(master)
-            with contextlib.suppress(OSError):
-                proc.wait()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                with contextlib.suppress(OSError):
+                    proc.kill()
+                proc.wait(timeout=2)
 
         return Result(success=True, data={})

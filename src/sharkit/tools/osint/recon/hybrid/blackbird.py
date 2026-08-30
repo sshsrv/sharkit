@@ -9,7 +9,6 @@ import select
 import struct
 import subprocess
 import termios
-from dataclasses import replace
 
 from sharkit.output.theme import PINK, hex_to_ansi
 from sharkit.tools.base import (
@@ -74,11 +73,6 @@ class BlackbirdTool(Tool):
 
     def get_options(self) -> dict[str, OptionDefinition]:
         return self._options
-
-    def set_option(self, key: str, value: str) -> None:
-        if key not in self._options:
-            raise ValueError(f'Option "{key}" not found.')
-        self._options[key] = replace(self._options[key], value=value)
 
     def execute(self, context: ExecutionContext) -> Result:
         from sharkit.tools.manager import ToolManager
@@ -188,7 +182,12 @@ class BlackbirdTool(Tool):
         except KeyboardInterrupt:
             # Catch Ctrl+C so a run aborts cleanly and the framework keeps running.
             with contextlib.suppress(OSError):
-                proc.kill()
+                proc.terminate()  # SIGTERM first
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                with contextlib.suppress(OSError):
+                    proc.kill()  # SIGKILL as fallback
             current = ""
             if renderer is not None:
                 # \r\033[K clears the ^C echo from the terminal before printing.
@@ -205,6 +204,10 @@ class BlackbirdTool(Tool):
                     print(_clean_ansi(current))
             with contextlib.suppress(OSError):
                 os.close(master)
-            with contextlib.suppress(OSError):
-                proc.wait()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                with contextlib.suppress(OSError):
+                    proc.kill()
+                proc.wait(timeout=2)
         return Result(success=True, data={})

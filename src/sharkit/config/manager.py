@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from sharkit.config.paths import (
@@ -34,7 +35,7 @@ class ConfigManager:
     def _load(self) -> None:
         try:
             content = self._config_file.read_text(encoding="utf-8")
-        except OSError as exc:
+        except (OSError, UnicodeDecodeError) as exc:
             raise ConfigurationError(f"Failed to read config file: {exc}") from exc
 
         for line_number, raw_line in enumerate(content.splitlines(), start=1):
@@ -49,16 +50,13 @@ class ConfigManager:
             self._config[key.strip()] = value.strip()
 
     def _save(self) -> None:
-        lines = []
-        for key, value in sorted(self._config.items()):
-            lines.append(f"{key}={value}")
-        content = "\n".join(lines)
-        if content:
-            content += "\n"
         try:
-            self._config_file.write_text(content, encoding="utf-8")
+            tmp = self._config_file.with_suffix(".tmp")
+            lines = [f"{k}={v}" for k, v in sorted(self._config.items())]
+            tmp.write_text("\n".join(lines) + "\n" if lines else "", encoding="utf-8")
+            os.replace(tmp, self._config_file)
         except OSError as exc:
-            raise ConfigurationError(f"Failed to write config file: {exc}") from exc
+            raise ConfigurationError(f"Failed to save config: {exc}") from exc
 
     def get(self, key: str, default: str | None = None) -> str | None:
         return self._config.get(key, default)

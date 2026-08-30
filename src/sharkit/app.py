@@ -33,8 +33,9 @@ NON_LINUX_MESSAGE = (
 
 
 def main() -> int:
-    sys.stdout.write("\033[2J\033[3J\033[H")
-    sys.stdout.flush()
+    if sys.stdout.isatty():
+        sys.stdout.write("\033[2J\033[3J\033[H")
+        sys.stdout.flush()
     renderer = Renderer()
 
     if sys.platform == "win32":
@@ -69,6 +70,7 @@ def main() -> int:
         history_manager=history_manager,
         renderer=renderer,
     )
+    console._session_data["http_client"] = http_client
 
     try:
         console.run()
