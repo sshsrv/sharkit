@@ -9,16 +9,21 @@ class PromptRenderer:
         return "shark > "
 
     def tool_prompt(self, tool_name: str) -> str:
-        return f"shark ({tool_name}) > "
+        if "/" in tool_name:
+            parts = tool_name.split("/", 1)
+            formatted = f"{parts[0]}({parts[1]})"
+        else:
+            formatted = tool_name
+        return f"shark {formatted} > "
 
     def render(self, prompt: str) -> list[tuple[str, str]]:
         if "(" in prompt and ")" in prompt:
             before, rest = prompt.split("(", 1)
-            tool_name, after = rest.split(")", 1)
+            tool_path, after = rest.split(")", 1)
             return [
                 (PROMPT_STYLE, before),
                 ("", "("),
-                (MODULE_STYLE, tool_name),
+                (MODULE_STYLE, tool_path),
                 ("", ")"),
                 ("", after),
             ]

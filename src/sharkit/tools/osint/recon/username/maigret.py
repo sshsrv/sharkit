@@ -31,41 +31,65 @@ def _clean_ansi(text: str) -> str:
     return _CSI_RE.sub(lambda m: m.group(0) if m.group(0).endswith("m") else "", text)
 
 
-class BlackbirdTool(Tool):
+class MaigretTool(Tool):
     metadata = ToolMetadata(
-        name="blackbird",
-        description="Blackbird multi-source OSINT aggregation tool",
+        name="maigret",
+        description="Maigret — username OSINT across 3000+ sites with recursive checks",
         category="recon",
-        author="p1ngul1n0",
+        author="soxoj",
         version="0.1.0",
         safety="safe",
-        color="#D0021B",
+        color="#FF6B35",
         install=ToolInstallSpec(
-            git_url="https://github.com/p1ngul1n0/blackbird.git",
-            requirements_file="requirements.txt",
-            entry="blackbird.py",
+            git_url="https://github.com/soxoj/maigret.git",
+            pip_args=["maigret"],
         ),
     )
 
     def __init__(self) -> None:
         self._options = {
-            "type": OptionDefinition(
-                name="type",
-                description="Search type: username or email",
-                required=True,
-                choices=["username", "email"],
-            ),
-            "query": OptionDefinition(
-                name="query",
-                description="Target to search (username or email)",
+            "username": OptionDefinition(
+                name="username",
+                description="Target username to hunt",
                 required=True,
             ),
-            "pdf": OptionDefinition(
-                name="pdf",
-                description="Export results to PDF",
+            "timeout": OptionDefinition(
+                name="timeout",
+                description="Timeout per site in seconds",
+                required=False,
+                default=None,
+            ),
+            "output": OptionDefinition(
+                name="output",
+                description="Write results to file",
+                required=False,
+                default=None,
+            ),
+            "json": OptionDefinition(
+                name="json",
+                description="Export results as JSON",
                 required=False,
                 default=None,
                 type="bool",
+            ),
+            "csv": OptionDefinition(
+                name="csv",
+                description="Export results as CSV",
+                required=False,
+                default=None,
+                type="bool",
+            ),
+            "site": OptionDefinition(
+                name="site",
+                description="Limit to specific site(s) (comma-separated)",
+                required=False,
+                default=None,
+            ),
+            "top_sites": OptionDefinition(
+                name="top_sites",
+                description="Only check top N most popular sites",
+                required=False,
+                default=None,
             ),
         }
 
@@ -94,22 +118,38 @@ class BlackbirdTool(Tool):
         spec = self.metadata.install
         if spec is None:
             return Result(success=False, error="Tool has no install spec.")
+
         install_dir = manager.install_path(name)
-        repo_dir = install_dir / "repo"
-        venv_python = install_dir / "venv" / "bin" / "python"
-        script = repo_dir / (spec.entry or "blackbird.py")
-        if not script.exists():
-            return Result(success=False, error=f"Entry script not found: {script}")
-        stype = context.options.get("type") or ""
-        query = context.options.get("query") or ""
-        if not stype or not query:
+        maigret_bin = install_dir / "venv" / "bin" / "maigret"
+        if not maigret_bin.exists():
             return Result(
                 success=False,
-                error="Both 'type' and 'query' options are required.",
+                error=f"Maigret binary not found: {maigret_bin}",
             )
-        args = [f"--{stype}", query, "--no-update"]
-        if parse_bool(context.options.get("pdf")):
-            args.append("--pdf")
+
+        username = context.options.get("username") or ""
+        if not username:
+            return Result(success=False, error="Option 'username' is required.")
+
+        args = [username, "--no-progressbar"]
+        timeout = context.options.get("timeout")
+        if timeout:
+            args.extend(["--timeout", str(timeout)])
+        output = context.options.get("output")
+        if output:
+            args.extend(["--output", str(output)])
+        if parse_bool(context.options.get("json")):
+            args.append("--json")
+        if parse_bool(context.options.get("csv")):
+            args.append("--csv")
+        site = context.options.get("site")
+        if site:
+            for s in str(site).split(","):
+                args.extend(["--site", s.strip()])
+        top_sites = context.options.get("top_sites")
+        if top_sites:
+            args.extend(["--top-sites", str(top_sites)])
+
         renderer = context.renderer
         master, slave = pty.openpty()
         try:
@@ -120,19 +160,21 @@ class BlackbirdTool(Tool):
             termios.tcsetattr(master, termios.TCSANOW, attrs)
         except OSError:
             pass
+
         env = os.environ.copy()
         env["TERM"] = "xterm-256color"
         env["FORCE_COLOR"] = "1"
         env["CLICOLOR"] = "1"
         env["CLICOLOR_FORCE"] = "1"
         env["COLUMNS"] = "10000"
+
         try:
             proc = subprocess.Popen(
-                [str(venv_python), str(script), *args],
+                [str(maigret_bin), *args],
                 stdout=slave,
                 stderr=slave,
                 stdin=subprocess.DEVNULL,
-                cwd=str(repo_dir),
+                cwd=str(install_dir),
                 env=env,
                 start_new_session=True,
             )
@@ -141,9 +183,11 @@ class BlackbirdTool(Tool):
         finally:
             with contextlib.suppress(OSError):
                 os.close(slave)
+
         first = True
         current = ""
         started = False
+        pending_blank = False
         try:
             while True:
                 try:
@@ -165,18 +209,26 @@ class BlackbirdTool(Tool):
                     started = True
                 for ch in chunk.decode("utf-8", errors="replace"):
                     if ch == "\n":
-                        if renderer is not None:
-                            renderer.gutter(name, _clean_ansi(current), tool_color, first)
+                        if current:
+                            if pending_blank:
+                                if renderer is not None:
+                                    renderer.gutter(name, "", tool_color, False)
+                                else:
+                                    print()
+                                pending_blank = False
+                            if renderer is not None:
+                                renderer.gutter(name, _clean_ansi(current), tool_color, first)
+                            else:
+                                print(_clean_ansi(current))
+                            first = False
                         else:
-                            print(_clean_ansi(current))
-                        first = False
+                            pending_blank = True
                         current = ""
                     elif ch == "\r":
                         current = ""
                     else:
                         current += ch
         except KeyboardInterrupt:
-            # Catch Ctrl+C so a run aborts cleanly and the framework keeps running.
             with contextlib.suppress(OSError):
                 proc.kill()
             current = ""
@@ -195,4 +247,5 @@ class BlackbirdTool(Tool):
                 os.close(master)
             with contextlib.suppress(OSError):
                 proc.wait()
+
         return Result(success=True, data={})

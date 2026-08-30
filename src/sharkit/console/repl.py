@@ -36,6 +36,11 @@ class _SharkitHistory(History):
     def store_string(self, string: str) -> None:
         self._manager.add_command(string)
 
+    def clear(self) -> None:
+        """Reset the in-memory buffer so next load() re-reads from file."""
+        self._loaded = False
+        self._loaded_strings = []
+
 
 class _ConsoleCompleter(Completer):
     def __init__(
@@ -100,9 +105,9 @@ class Console:
 
     def _get_prompt(self) -> Any:
         if self._current_tool is not None:
-            prompt = f"shark ({self._current_tool}) > "
+            prompt = self._prompt_renderer.tool_prompt(self._current_tool)
         else:
-            prompt = "shark > "
+            prompt = self._prompt_renderer.default_prompt()
         return self._prompt_renderer.render(prompt)
 
     def _init_session(self) -> None:
@@ -113,12 +118,14 @@ class Console:
             tool_registry=self._tool_registry,
             get_current_tool=lambda: self._current_tool,
         )
+        self._sharkit_history = _SharkitHistory(self._history_manager)
         self._prompt_session = PromptSession[str](
-            history=_SharkitHistory(self._history_manager),
+            history=self._sharkit_history,
             completer=self._completer,
             style=_PROMPT_STYLE,
             complete_while_typing=True,
         )
+        self._session_data["sharkit_history"] = self._sharkit_history
 
     def run(self) -> None:
         self._init_session()

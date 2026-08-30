@@ -71,3 +71,17 @@ class ToolRegistry:
         for path, name in self._paths.items():
             result[path] = self._tools[name]
         return result
+
+    def get_tool_path(self, name: str) -> str:
+        """Return the full path for a tool name, or just the name if no path."""
+        for path, tool_name in self._paths.items():
+            if tool_name == name:
+                return path
+        return name
+
+    def format_display(self, path: str) -> str:
+        """Format tool path as 'category(subpath)' for display."""
+        if "/" in path:
+            parts = path.split("/", 1)
+            return f"{parts[0]}({parts[1]})"
+        return path

@@ -1,5 +1,5 @@
 <div align="center"><img width="640" height="347" alt="banner" src="https://github.com/user-attachments/assets/c027fb38-fe0f-4baa-b35f-597f9f8cf39b" /></div>
-
+<br>
 <div align="center">
   
 ![PyPI](https://img.shields.io/pypi/v/sharkit?labelColor=000000&color=ff5faf&style=flat)

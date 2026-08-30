@@ -187,6 +187,7 @@ class UseCommand(Command):
         if tool_cls is not None and tool_cls.metadata.install is not None:
             spec = tool_cls.metadata.install
             name = tool_cls.metadata.name
+            display = tool_registry.format_display(path) if tool_registry else name
             if tool_manager is not None and not tool_manager.is_installed(name):
                 if not self._prompt_install(name):
                     self._log(context, f'Tool "{name}" is not installed. Run: install {name}')
@@ -195,7 +196,7 @@ class UseCommand(Command):
 
                 def on_progress(msg: str) -> None:
                     if renderer is not None:
-                        renderer.log_line(f"install ({name})", msg, color=GREEN)
+                        renderer.log_line(f"install {display}", msg, color=GREEN)
 
                 ok, message = tool_manager.install(name, spec, on_progress=on_progress)
                 if not ok:
@@ -203,6 +204,15 @@ class UseCommand(Command):
                     return None
         context.current_tool = path
         self._log(context, f'Tool "{path}" selected.')
+        if tool_cls is not None and tool_cls.metadata.install is not None:
+            renderer = context.session.get("renderer")
+            if renderer is not None:
+                install_spec = tool_cls.metadata.install
+                renderer.support_creator(
+                    tool_cls.metadata.author,
+                    tool_cls.metadata.name,
+                    install_spec.git_url,
+                )
         return None
 
     def _prompt_install(self, name: str) -> bool:
@@ -552,6 +562,9 @@ class HistoryCommand(Command):
         if clear:
             manager.clear()
             context.session["history"] = []
+            sharkit_history = context.session.get("sharkit_history")
+            if sharkit_history is not None:
+                sharkit_history.clear()
             return "[+] Command history and history file cleared"
 
         all_entries = manager.get_history(10_000_000)
@@ -614,23 +627,24 @@ class InstallCommand(Command):
         tool_cls = tool_registry.get_tool(name)
         if tool_cls is None or tool_cls.metadata.install is None:
             return f'Tool "{name}" is not an external tool or was not found.'
+        display = tool_registry.format_display(tool_registry.get_tool_path(name))
         if tool_manager.is_installed(name):
             renderer = context.session.get("renderer")
             if renderer is not None:
-                renderer.log_line(f"install ({name})", "already installed", color=GREEN)
+                renderer.log_line(f"install {display}", "already installed", color=GREEN)
             return None
         renderer = context.session.get("renderer")
 
         def on_progress(msg: str) -> None:
             if renderer is not None:
-                renderer.log_line(f"install ({name})", msg, color=GREEN)
+                renderer.log_line(f"install {display}", msg, color=GREEN)
 
         ok, message = tool_manager.install(name, tool_cls.metadata.install, on_progress=on_progress)
         if renderer is not None:
             if ok:
-                renderer.log_line(f"install ({name})", "installed", color=GREEN)
+                renderer.log_line(f"install {display}", "installed", color=GREEN)
             else:
-                renderer.log_line(f"install ({name})", f"failed: {message}", color=GREEN)
+                renderer.log_line(f"install {display}", f"failed: {message}", color=GREEN)
             return None
         return str(message)
 
@@ -657,23 +671,24 @@ class UpgradeCommand(Command):
         tool_cls = tool_registry.get_tool(name)
         if tool_cls is None or tool_cls.metadata.install is None:
             return f'Tool "{name}" is not an external tool or was not found.'
+        display = tool_registry.format_display(tool_registry.get_tool_path(name))
         if not tool_manager.is_installed(name):
             renderer = context.session.get("renderer")
             if renderer is not None:
-                renderer.log_line(f"upgrade ({name})", "not installed (skipped)", color=BLUE)
+                renderer.log_line(f"upgrade {display}", "not installed (skipped)", color=BLUE)
             return None
         renderer = context.session.get("renderer")
 
         def on_progress(msg: str) -> None:
             if renderer is not None:
-                renderer.log_line(f"upgrade ({name})", msg, color=BLUE)
+                renderer.log_line(f"upgrade {display}", msg, color=BLUE)
 
         ok, message = tool_manager.update(name, tool_cls.metadata.install, on_progress=on_progress)
         if renderer is not None:
             if ok:
-                renderer.log_line(f"upgrade ({name})", "upgraded", color=BLUE)
+                renderer.log_line(f"upgrade {display}", "upgraded", color=BLUE)
             else:
-                renderer.log_line(f"upgrade ({name})", f"failed: {message}", color=BLUE)
+                renderer.log_line(f"upgrade {display}", f"failed: {message}", color=BLUE)
             return None
         return str(message)
 
@@ -699,23 +714,24 @@ class UpgradeCommand(Command):
             if spec is None:
                 continue
             name = meta.name
+            display = tool_registry.format_display(tool_registry.get_tool_path(name))
             if not tool_manager.is_installed(name):
                 renderer = context.session.get("renderer")
                 if renderer is not None:
-                    renderer.log_line(f"upgrade ({name})", "not installed (skipped)", color=BLUE)
+                    renderer.log_line(f"upgrade {display}", "not installed (skipped)", color=BLUE)
                 continue
             renderer = context.session.get("renderer")
 
-            def on_progress(msg: str, name: str = name, renderer: Any = renderer) -> None:
+            def on_progress(msg: str, display: str = display, renderer: Any = renderer) -> None:
                 if renderer is not None:
-                    renderer.log_line(f"upgrade ({name})", msg, color=BLUE)
+                    renderer.log_line(f"upgrade {display}", msg, color=BLUE)
 
             ok, message = tool_manager.update(name, spec, on_progress=on_progress)
             if renderer is not None:
                 if ok:
-                    renderer.log_line(f"upgrade ({name})", "upgraded", color=BLUE)
+                    renderer.log_line(f"upgrade {display}", "upgraded", color=BLUE)
                 else:
-                    renderer.log_line(f"upgrade ({name})", f"failed: {message}", color=BLUE)
+                    renderer.log_line(f"upgrade {display}", f"failed: {message}", color=BLUE)
         return None
 
 
@@ -737,13 +753,14 @@ class RemoveCommand(Command):
         tool_cls = tool_registry.get_tool(name)
         if tool_cls is None or tool_cls.metadata.install is None:
             return f'Tool "{name}" is not an external tool or was not found.'
+        display = tool_registry.format_display(tool_registry.get_tool_path(name))
         renderer = context.session.get("renderer")
         ok, message = tool_manager.uninstall(name)
         if renderer is not None:
             if ok:
-                renderer.log_line(f"remove ({name})", "removed", color=RED)
+                renderer.log_line(f"remove {display}", "removed", color=RED)
             else:
-                renderer.log_line(f"remove ({name})", f"failed: {message}", color=RED)
+                renderer.log_line(f"remove {display}", f"failed: {message}", color=RED)
             return None
         return str(message)
 
