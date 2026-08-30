@@ -674,7 +674,10 @@ class InstallCommand(Command):
             if first_progress[0]:
                 renderer.log_line(tag, msg, color=GREEN)
             else:
-                renderer.gutter(tag, msg, GREEN, is_first=False)
+                lines = msg.splitlines() or [""]
+                renderer.gutter(tag, lines[0], GREEN, is_first=False)
+                for line in lines[1:]:
+                    print(f"{GREEN}{BOLD}│{RESET} {line}")
             return None
         return str(message)
 
@@ -736,7 +739,10 @@ class UpgradeCommand(Command):
             if first_progress[0]:
                 renderer.log_line(tag, msg, color=BLUE)
             else:
-                renderer.gutter(tag, msg, BLUE, is_first=False)
+                lines = msg.splitlines() or [""]
+                renderer.gutter(tag, lines[0], BLUE, is_first=False)
+                for line in lines[1:]:
+                    print(f"{BLUE}{BOLD}│{RESET} {line}")
             return None
         return str(message)
 
@@ -797,7 +803,10 @@ class UpgradeCommand(Command):
                 if first_progress[0]:
                     renderer.log_line(tag, msg, color=BLUE)
                 else:
-                    renderer.gutter(tag, msg, BLUE, is_first=False)
+                    lines = msg.splitlines() or [""]
+                    renderer.gutter(tag, lines[0], BLUE, is_first=False)
+                    for line in lines[1:]:
+                        print(f"{BLUE}{BOLD}│{RESET} {line}")
         return None
 
 
