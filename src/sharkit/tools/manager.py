@@ -96,4 +96,7 @@ class ToolManager:
             return False, f'Failed to uninstall "{name}": {e}'
 
     def _run(self, cmd: list[str]) -> None:
-        subprocess.run(cmd, check=True, capture_output=True)
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            detail = result.stderr.strip() or result.stdout.strip() or "No output"
+            raise RuntimeError(detail)
