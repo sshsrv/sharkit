@@ -107,7 +107,7 @@ class BlackbirdTool(Tool):
                 success=False,
                 error="Both 'type' and 'query' options are required.",
             )
-        args = [f"--{stype}", query, "--no-update"]
+        args = [f"--{stype}", query]
         if parse_bool(context.options.get("pdf")):
             args.append("--pdf")
         renderer = context.renderer
@@ -191,6 +191,8 @@ class BlackbirdTool(Tool):
                 proc.kill()
             current = ""
             if renderer is not None:
+                # \r\033[K clears the ^C echo from the terminal before printing.
+                print("\r\033[K", end="")
                 renderer.gutter(name, "Run aborted (Ctrl+C).", tool_color, first)
             else:
                 print("Run aborted (Ctrl+C).")

@@ -20,7 +20,7 @@ NON_LINUX_MESSAGE = (
     "it was built for open water,\n"
     "where it can actually swim.\n"
     "\n"
-    "windows/mac is more of a glass aquarium.\n"
+    "windows is more of a glass aquarium.\n"
     "tidy, bright, and a little too enclosed.\n"
     "\n"
     "the shark doesn't dislike the aquarium.\n"
@@ -37,7 +37,7 @@ def main() -> int:
     sys.stdout.flush()
     renderer = Renderer()
 
-    if sys.platform != "linux":
+    if sys.platform == "win32":
         renderer.banner(tool_count=0, message=NON_LINUX_MESSAGE)
         return 1
 

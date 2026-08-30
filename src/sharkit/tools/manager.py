@@ -54,7 +54,11 @@ class ToolManager:
                     self._run([pip, "install", *spec.pip_args])
             dest.joinpath(".installed").write_text(name)
             return True, f'Tool "{name}" installed.'
+        except KeyboardInterrupt:
+            shutil.rmtree(dest, ignore_errors=True)
+            return False, "Aborted"
         except Exception as e:
+            shutil.rmtree(dest, ignore_errors=True)
             return False, f'Failed to install "{name}": {e}'
 
     def update(
@@ -82,6 +86,8 @@ class ToolManager:
                         on_progress("upgrading packages...")
                     self._run([pip, "install", "--upgrade", *spec.pip_args])
             return True, f'Tool "{name}" updated.'
+        except KeyboardInterrupt:
+            return False, "Aborted"
         except Exception as e:
             return False, f'Failed to update "{name}": {e}'
 
@@ -96,4 +102,12 @@ class ToolManager:
             return False, f'Failed to uninstall "{name}": {e}'
 
     def _run(self, cmd: list[str]) -> None:
-        subprocess.run(cmd, check=True, capture_output=True)
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            stderr = result.stderr.strip() if result.stderr else ""
+            stdout = result.stdout.strip() if result.stdout else ""
+            raw = stderr or stdout or "No output"
+            # Truncate long build output — keep last 20 lines where the actual error lives
+            lines = raw.splitlines()
+            detail = "\n".join(lines[-20:]) if len(lines) > 20 else raw
+            raise RuntimeError(detail)

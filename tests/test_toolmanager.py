@@ -1,8 +1,17 @@
+from dataclasses import dataclass
+
 from sharkit.commands.base import CommandContext
 from sharkit.commands.builtins import InstallCommand, RemoveCommand, UpgradeCommand, UseCommand
 from sharkit.tools.base import Tool, ToolInstallSpec, ToolMetadata
 from sharkit.tools.manager import ToolManager
 from sharkit.tools.registry import ToolRegistry
+
+
+@dataclass
+class _FakeResult:
+    returncode: int = 0
+    stdout: str = ""
+    stderr: str = ""
 
 
 def test_is_installed_false_when_absent(tmp_path):
@@ -14,7 +23,7 @@ def test_install_writes_marker_and_is_installed(tmp_path, monkeypatch):
     mgr = ToolManager(tools_root=tmp_path / "tools")
     monkeypatch.setattr(
         "sharkit.tools.manager.subprocess.run",
-        lambda *a, **k: None,
+        lambda *a, **k: _FakeResult(),
     )
     spec = ToolInstallSpec(
         git_url="https://example.com/x.git",
@@ -30,7 +39,7 @@ def test_uninstall_removes_marker(tmp_path, monkeypatch):
     mgr = ToolManager(tools_root=tmp_path / "tools")
     monkeypatch.setattr(
         "sharkit.tools.manager.subprocess.run",
-        lambda *a, **k: None,
+        lambda *a, **k: _FakeResult(),
     )
     spec = ToolInstallSpec(git_url="https://example.com/x.git")
     mgr.install("x", spec)
