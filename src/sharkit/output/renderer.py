@@ -253,7 +253,10 @@ class Renderer:
         print(text, end="")
 
     def log_line(self, tag: str, message: str, color: str = PINK) -> None:
-        print(f"{color}{BOLD}{tag} - {RESET}{message}")
+        lines = message.splitlines() or [""]
+        self.gutter(tag, lines[0], color, is_first=True)
+        for line in lines[1:]:
+            print(f"{color}{BOLD}│{RESET} {line}")
 
     def gutter(self, name: str, line: str, color: str, is_first: bool) -> None:
         if is_first:

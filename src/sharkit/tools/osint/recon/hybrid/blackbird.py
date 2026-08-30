@@ -107,7 +107,7 @@ class BlackbirdTool(Tool):
                 success=False,
                 error="Both 'type' and 'query' options are required.",
             )
-        args = [f"--{stype}", query, "--no-update"]
+        args = [f"--{stype}", query]
         if parse_bool(context.options.get("pdf")):
             args.append("--pdf")
         renderer = context.renderer
