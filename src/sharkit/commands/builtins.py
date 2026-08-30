@@ -286,7 +286,7 @@ class ShowCommand(Command):
     name = "show"
     aliases = []
     description = "Show tools or tool options"
-    usage = "show <all|osint|humint|options> [tool]"
+    usage = "show <all|osint|humint|geoint|options> [tool]"
 
     def execute(self, context: CommandContext, args: list[str]) -> str | None:
         if not args:
@@ -297,7 +297,7 @@ class ShowCommand(Command):
             return self._show_options(context, args[1] if len(args) > 1 else None)
         if args[0] == "all":
             return self._show_tools(context, None)
-        if args[0] in ("osint", "humint"):
+        if args[0] in ("osint", "humint", "geoint"):
             return self._show_tools(context, args[0])
         return f"Unknown show subcommand: {args[0]}\nUsage: {self.usage}"
 
@@ -307,35 +307,47 @@ class ShowCommand(Command):
         renderer = context.session.get("renderer")
         if tool_registry is None or renderer is None:
             return "Tool registry not available."
+
         all_tools = tool_registry.get_all_tools()
         if not all_tools:
             return "No tools available."
 
-        categories: dict[str, list[tuple[str, type]]] = {}
-        for tool_path, tool_cls in all_tools.items():
-            meta = tool_cls.metadata
-            cat = meta.category.split(".")[0] if meta.category else "other"
-            if category and cat != category:
-                continue
-            categories.setdefault(cat, []).append((tool_path, tool_cls))
+        def matches_category(tool_path: str, tool_cls: type) -> bool:
+            if category is None:
+                return True
 
-        if not categories:
+            normalized_category = category.lower()
+            tool_category = (tool_cls.metadata.category or "").lower()
+            first_segment = tool_category.split(".")[0]
+            return (
+                normalized_category == tool_category
+                or normalized_category == first_segment
+                or normalized_category in tool_category
+                or tool_path.lower().startswith(f"{normalized_category}/")
+            )
+
+        filtered = [
+            (tool_path, tool_cls)
+            for tool_path, tool_cls in all_tools.items()
+            if matches_category(tool_path, tool_cls)
+        ]
+
+        if not filtered:
             return f'No tools found for category "{category}".'
 
         title = f"show > {category or 'all'}"
-        for cat_name in sorted(categories):
-            tools = sorted(categories[cat_name], key=lambda x: x[0])
-            rows = []
-            for tool_path, tool_cls in tools:
-                meta = tool_cls.metadata
-                if meta.install is None or (
-                    tool_manager is not None and tool_manager.is_installed(meta.name)
-                ):
-                    installed = f"{BOLD}{PINK}Yes{RESET}"
-                else:
-                    installed = ""
-                rows.append([tool_path, installed, meta.description])
-            renderer.table(f"{title} > {cat_name}", ["Tool", "Installed", "Description"], rows)
+        rows = []
+        for tool_path, tool_cls in sorted(filtered, key=lambda item: item[0]):
+            meta = tool_cls.metadata
+            if meta.install is None or (
+                tool_manager is not None and tool_manager.is_installed(meta.name)
+            ):
+                installed = f"{BOLD}{PINK}Yes{RESET}"
+            else:
+                installed = ""
+            rows.append([tool_path, installed, meta.description])
+
+        renderer.table(title, ["Tool", "Installed", "Description"], rows)
         return None
 
     def _show_options(self, context: CommandContext, tool_arg: str | None) -> str | None:

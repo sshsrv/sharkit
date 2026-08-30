@@ -42,7 +42,10 @@ class CompletionEngine:
 
         if text_lower.startswith("show "):
             prefix = text_lower[5:]
-            return sorted(s for s in ("all", "osint", "humint", "options") if s.startswith(prefix))
+            return sorted(
+                s for s in ("all", "osint", "humint", "geoint", "options")
+                if s.startswith(prefix)
+            )
 
         if text_lower.startswith("set ") or text_lower.startswith("unset "):
             if current_tool is None:
