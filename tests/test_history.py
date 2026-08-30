@@ -10,10 +10,10 @@ def _make_manager(tmp_path, monkeypatch):
 def test_history_manager_add_and_get(tmp_path, monkeypatch):
     manager = _make_manager(tmp_path, monkeypatch)
     manager.add_command("help")
-    manager.add_command("use testing/demo/echo")
+    manager.add_command("use blackbird")
     history = manager.get_history()
     assert "help" in history
-    assert "use testing/demo/echo" in history
+    assert "use blackbird" in history
 
 
 def test_history_manager_persistence(tmp_path, monkeypatch):
@@ -39,10 +39,10 @@ def test_history_manager_filters_sensitive(tmp_path, monkeypatch):
 
 def test_history_manager_search(tmp_path, monkeypatch):
     manager = _make_manager(tmp_path, monkeypatch)
-    manager.add_command("use testing/demo/echo")
-    manager.add_command("use testing/http/metadata")
+    manager.add_command("use blackbird")
+    manager.add_command("use recon")
     manager.add_command("help")
-    results = manager.search("testing")
+    results = manager.search("use")
     assert len(results) == 2
     assert "help" not in results
 

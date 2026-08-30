@@ -8,27 +8,27 @@ class ConfigurationError(SharkitError):
     pass
 
 
-class ModuleError(SharkitError):
+class ToolError(SharkitError):
     pass
 
 
-class ModuleNotFoundError(ModuleError):
+class ToolNotFoundError(ToolError):
     def __init__(self, name: str) -> None:
-        super().__init__(f'Module "{name}" was not found.')
-        self.module_name = name
+        super().__init__(f'Tool "{name}" was not found.')
+        self.tool_name = name
 
 
-class ModuleExecutionError(ModuleError):
-    def __init__(self, module_name: str, reason: str) -> None:
-        super().__init__(f'Module "{module_name}" execution failed: {reason}')
-        self.module_name = module_name
+class ToolExecutionError(ToolError):
+    def __init__(self, tool_name: str, reason: str) -> None:
+        super().__init__(f'Tool "{tool_name}" execution failed: {reason}')
+        self.tool_name = tool_name
         self.reason = reason
 
 
-class ModuleLoadError(ModuleError):
-    def __init__(self, module_path: str, reason: str) -> None:
-        super().__init__(f'Failed to load module from "{module_path}": {reason}')
-        self.module_path = module_path
+class ToolLoadError(ToolError):
+    def __init__(self, tool_path: str, reason: str) -> None:
+        super().__init__(f'Failed to load tool from "{tool_path}": {reason}')
+        self.tool_path = tool_path
         self.reason = reason
 
 

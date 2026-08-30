@@ -1,6 +1,7 @@
 import re
 import shutil
 import textwrap
+import unicodedata
 
 from sharkit import __version__
 from sharkit.output.theme import (
@@ -32,7 +33,8 @@ x88:  `)8b.  888E~?888L .@88 "8888"   4888>'88"    888E`"88*"  ''888E`   8888
 
 
 def _visible_len(text: str) -> int:
-    return len(ANSI_RE.sub("", text))
+    clean = ANSI_RE.sub("", text)
+    return sum(2 if unicodedata.east_asian_width(ch) in ("W", "F") else 1 for ch in clean)
 
 
 def _pad(text: str, width: int) -> str:
@@ -55,7 +57,7 @@ def _term_width() -> int:
 class Renderer:
     def panel(
         self,
-        title: str,
+        title: str | None,
         content: str,
         min_width: int = 0,
         centered: bool = False,
@@ -73,11 +75,12 @@ class Renderer:
         else:
             lines = content.splitlines()
         content_width = max((_visible_len(line) for line in lines), default=0)
-        title_width = _visible_len(title)
+        title_width = _visible_len(title) if title else 0
         inner = max(content_width, title_width + 3, min_width)
-        box_width = inner + 4
 
-        if centered:
+        if title is None:
+            top = f"{PINK}╭{'─' * (inner + 2)}╮{RESET}"
+        elif centered:
             gap = inner - title_width
             left = gap // 2
             right = gap - left
@@ -88,6 +91,7 @@ class Renderer:
         else:
             dashes = max(0, inner - title_width - 1)
             top = f"{PINK}╭─ {BOLD}{WHITE}{title}{RESET}{PINK} {'─' * dashes}╮{RESET}"
+
         if centered:
             body = [f"{PINK}│{RESET} {_center(line, inner)} {PINK}│{RESET}" for line in lines]
         else:
@@ -96,7 +100,7 @@ class Renderer:
 
         all_lines = [top, *body, bottom]
         if centered:
-            pad = max(0, (_term_width() - box_width) // 2)
+            pad = max(0, (_term_width() - (inner + 4)) // 2)
             all_lines = [" " * pad + ln for ln in all_lines]
         for ln in all_lines:
             print(ln)
@@ -115,7 +119,7 @@ class Renderer:
 
     def banner(
         self,
-        module_count: int = 0,
+        tool_count: int = 0,
         centered: bool = True,
         message: str | None = None,
     ) -> None:
@@ -142,7 +146,7 @@ class Renderer:
             self.centered_box(message)
             return
 
-        print(self._centered_line(f"{DIM}currently serving {module_count} modules{RESET}"))
+        print(self._centered_line(f"{DIM}currently serving {tool_count} tools{RESET}"))
         print()
         disclaimer = (
             "sharkit is intended for lawful OSINT research, authorized security testing, "
@@ -238,12 +242,35 @@ class Renderer:
         lines = [f"{BOLD}{key}{RESET}  {value}" for key, value in data.items()]
         self.panel("result", "\n".join(lines))
 
-    def module_info(self, metadata: dict[str, str]) -> None:
+    def tool_info(self, metadata: dict[str, str]) -> None:
         lines = [
             f"{GRAY}{key}{RESET}  {BOLD}{value}{RESET}"
             for key, value in metadata.items()
         ]
-        self.panel("module info", "\n".join(lines))
+        self.panel("tool info", "\n".join(lines))
 
     def raw(self, text: str) -> None:
         print(text, end="")
+
+    def log_line(self, tag: str, message: str, color: str = PINK) -> None:
+        print(f"{color}{BOLD}{tag} - {RESET}{message}")
+
+    def gutter(self, name: str, line: str, color: str, is_first: bool) -> None:
+        if is_first:
+            prefix = f"{RESET}{color}{BOLD}{name}{RESET} {color}{BOLD}│{RESET} "
+        else:
+            prefix = f"{RESET}{' ' * (len(name) + 1)}{color}{BOLD}│{RESET} "
+        print(prefix + line)
+
+    def support_creator(self, author: str, tool_name: str, git_url: str) -> None:
+        lines = [
+            f"Thanks to {author} for building {tool_name}!",
+            "If you find this tool useful, please consider:",
+            "",
+            f"⭐ Star the repo: {git_url}",
+            f"🐛 Report issues: {git_url}/issues",
+            f"💰 Sponsor the author: {git_url}/sponsors",
+            "",
+            f"{DIM}Without creators like them, sharkit wouldn't exist! :3{RESET}",
+        ]
+        self.panel(None, "\n".join(lines))

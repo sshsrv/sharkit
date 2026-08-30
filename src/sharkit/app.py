@@ -9,10 +9,11 @@ from sharkit.config.manager import ConfigManager
 from sharkit.console.repl import Console
 from sharkit.exceptions import SharkitError
 from sharkit.history.manager import HistoryManager
-from sharkit.modules.loader import discover_modules
-from sharkit.modules.registry import ModuleRegistry
 from sharkit.network.client import HttpClient
 from sharkit.output.renderer import Renderer
+from sharkit.tools.loader import discover_tools
+from sharkit.tools.manager import ToolManager
+from sharkit.tools.registry import ToolRegistry
 
 NON_LINUX_MESSAGE = (
     "sharkit is a shark.\n"
@@ -37,18 +38,19 @@ def main() -> int:
     renderer = Renderer()
 
     if sys.platform != "linux":
-        renderer.banner(module_count=0, message=NON_LINUX_MESSAGE)
+        renderer.banner(tool_count=0, message=NON_LINUX_MESSAGE)
         return 1
 
     config_manager = ConfigManager()
 
     history_manager = HistoryManager()
 
-    module_registry = ModuleRegistry()
-    modules_dir = Path(__file__).parent / "modules"
-    discovered = discover_modules(modules_dir)
-    for module_class, module_path in discovered:
-        module_registry.register_module(module_class, module_path)
+    tool_registry = ToolRegistry()
+    tool_manager = ToolManager()
+    tools_dir = Path(__file__).parent / "tools"
+    discovered = discover_tools(tools_dir)
+    for tool_class, tool_path in discovered:
+        tool_registry.register_tool(tool_class, tool_path)
 
     command_registry = CommandRegistry()
     for command_class in BUILTIN_COMMANDS:
@@ -56,12 +58,13 @@ def main() -> int:
 
     http_client = HttpClient()
 
-    renderer.banner(module_count=len(discovered))
+    renderer.banner(tool_count=len(discovered))
     print()
 
     console = Console(
         command_registry=command_registry,
-        module_registry=module_registry,
+        tool_registry=tool_registry,
+        tool_manager=tool_manager,
         config_manager=config_manager,
         history_manager=history_manager,
         renderer=renderer,
