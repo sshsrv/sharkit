@@ -191,6 +191,8 @@ class BlackbirdTool(Tool):
                 proc.kill()
             current = ""
             if renderer is not None:
+                # \r\033[K clears the ^C echo from the terminal before printing.
+                print("\r\033[K", end="")
                 renderer.gutter(name, "Run aborted (Ctrl+C).", tool_color, first)
             else:
                 print("Run aborted (Ctrl+C).")

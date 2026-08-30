@@ -382,7 +382,13 @@ class SetCommand(Command):
             tool_instance.set_option(key, value)
             renderer = context.session.get("renderer")
             if renderer is not None:
-                renderer.log_line(f"set ({context.current_tool})", f"{key} = {value}")
+                tool_registry = context.session.get("tool_registry")
+                display = context.current_tool
+                if tool_registry is not None and context.current_tool is not None:
+                    display = tool_registry.format_display(
+                        tool_registry.get_tool_path(context.current_tool),
+                    )
+                renderer.log_line(f"set {display}", f"{key} = {value}")
                 return None
             return f"Set {key} = {value}"
         except Exception as e:

@@ -233,6 +233,7 @@ class SherlockTool(Tool):
                 proc.kill()
             current = ""
             if renderer is not None:
+                print("\r\033[K", end="")
                 renderer.gutter(name, "Run aborted (Ctrl+C).", tool_color, first)
             else:
                 print("Run aborted (Ctrl+C).")
