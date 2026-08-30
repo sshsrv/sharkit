@@ -115,7 +115,7 @@ class Renderer:
 
     def banner(
         self,
-        module_count: int = 0,
+        tool_count: int = 0,
         centered: bool = True,
         message: str | None = None,
     ) -> None:
@@ -142,7 +142,7 @@ class Renderer:
             self.centered_box(message)
             return
 
-        print(self._centered_line(f"{DIM}currently serving {module_count} modules{RESET}"))
+        print(self._centered_line(f"{DIM}currently serving {tool_count} tools{RESET}"))
         print()
         disclaimer = (
             "sharkit is intended for lawful OSINT research, authorized security testing, "
@@ -238,12 +238,22 @@ class Renderer:
         lines = [f"{BOLD}{key}{RESET}  {value}" for key, value in data.items()]
         self.panel("result", "\n".join(lines))
 
-    def module_info(self, metadata: dict[str, str]) -> None:
+    def tool_info(self, metadata: dict[str, str]) -> None:
         lines = [
             f"{GRAY}{key}{RESET}  {BOLD}{value}{RESET}"
             for key, value in metadata.items()
         ]
-        self.panel("module info", "\n".join(lines))
+        self.panel("tool info", "\n".join(lines))
 
     def raw(self, text: str) -> None:
         print(text, end="")
+
+    def log_line(self, tag: str, message: str, color: str = PINK) -> None:
+        print(f"{color}{BOLD}{tag} - {RESET}{message}")
+
+    def gutter(self, name: str, line: str, color: str, is_first: bool) -> None:
+        if is_first:
+            prefix = f"{RESET}{color}{BOLD}{name}{RESET} {color}{BOLD}│{RESET} "
+        else:
+            prefix = f"{RESET}{' ' * (len(name) + 1)}{color}{BOLD}│{RESET} "
+        print(prefix + line)

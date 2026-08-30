@@ -26,8 +26,8 @@ def test_command_execute():
     cmd = MockCommand()
     context = CommandContext(
         session={},
-        modules=[],
-        current_module=None,
+        tools=[],
+        current_tool=None,
         output=None,
     )
     result = cmd.execute(context, ["arg1", "arg2"])
@@ -74,7 +74,7 @@ def test_registry_completions():
 
 
 def test_builtin_commands_count():
-    assert len(BUILTIN_COMMANDS) == 15
+    assert len(BUILTIN_COMMANDS) == 18
 
 
 def test_quit_is_alias_of_exit():

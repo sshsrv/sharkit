@@ -17,9 +17,9 @@
 
 ### Features
 - A terminal framework for OSINT / HUMINT / GEOINT work.
-- Modules expose a `run` method, options, and metadata; the shell loads them as you need them.
+- Tools expose a `run` method, options, and metadata; the shell loads them as you need them.
 - 15 built-in commands: `use`, `run`, `set`, `search`, `history`, `clear`, `exit`, and a few more.
-- Ships with two example modules: `testing/demo/echo` and `testing/http/metadata`.
+- Tools are discovered automatically from `src/sharkit/tools/`.
 - `sharkit --version` shows the exact build you have, dev pre-releases included.
 - State lives in `~/.config/sharkit` and runs fine on Termux / Android.
 - To wipe it completely: `uv tool uninstall sharkit` and `rm -rf ~/.config/sharkit`.

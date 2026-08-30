@@ -8,8 +8,8 @@ from typing import Any
 @dataclass
 class CommandContext:
     session: dict[str, Any] = field(default_factory=dict)
-    modules: list[Any] = field(default_factory=list)
-    current_module: str | None = None
+    tools: list[Any] = field(default_factory=list)
+    current_tool: str | None = None
     output: Any = None
 
 

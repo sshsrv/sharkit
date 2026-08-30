@@ -5,4 +5,4 @@ try:
 
     __version__ = _pkg_version("sharkit")
 except Exception:
-    __version__ = "0.1.0"
+    __version__ = "0.2.0.dev1"
