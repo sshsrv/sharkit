@@ -65,32 +65,44 @@ class SSLCheckTool(Tool):
         except Exception as exc:
             return Result(success=False, error=f"SSL connection failed: {exc}")
 
+        if cert is None:
+            return Result(success=False, error=f"No certificate available for {host}:{port}.")
+
+        def _flatten_name_entries(value: object) -> dict[str, str]:
+            result: dict[str, str] = {}
+            items = value if isinstance(value, (list, tuple)) else ()
+            for item in items:
+                if not isinstance(item, (list, tuple)):
+                    continue
+                for pair in item:
+                    if not isinstance(pair, (list, tuple)) or len(pair) != 2:
+                        continue
+                    key, val = pair
+                    if isinstance(key, str) and isinstance(val, str):
+                        result[key] = val
+            return result
+
         lines: list[str] = [f"SSL Certificate for {host}:{port}:"]
         lines.append("")
 
-        # Subject
-        subject = dict(x[0] for x in cert.get("subject", ()))
+        subject = _flatten_name_entries(cert.get("subject"))
         subject_str = ", ".join(f"{k}={v}" for k, v in subject.items())
         lines.append(f"  Subject:          {subject_str}")
 
-        # Issuer
-        issuer = dict(x[0] for x in cert.get("issuer", ()))
+        issuer = _flatten_name_entries(cert.get("issuer"))
         issuer_str = ", ".join(f"{k}={v}" for k, v in issuer.items())
         lines.append(f"  Issuer:           {issuer_str}")
 
-        # Serial number
-        serial = cert.get("serialNumber", "?")
+        serial = str(cert.get("serialNumber", "?"))
         lines.append(f"  Serial Number:    {serial}")
 
-        # Validity
-        not_before = cert.get("notBefore", "?")
-        not_after = cert.get("notAfter", "?")
+        not_before = str(cert.get("notBefore", "?"))
+        not_after = str(cert.get("notAfter", "?"))
         lines.append(f"  Valid From:       {not_before}")
         lines.append(f"  Valid Until:      {not_after}")
 
-        # Check expiry
         try:
-            expire_dt = datetime.datetime.strptime(not_after, "%b %d %H:%M:%S %Y %Z")
+            expire_dt = datetime.datetime.strptime(str(not_after), "%b %d %H:%M:%S %Y %Z")
             now = datetime.datetime.now(datetime.UTC)
             if expire_dt.replace(tzinfo=datetime.UTC) < now:
                 lines.append("  Status:           *** EXPIRED ***")
@@ -100,15 +112,21 @@ class SSLCheckTool(Tool):
         except ValueError:
             pass
 
-        # SAN
         san_ext = cert.get("subjectAltName", ())
-        if san_ext:
-            sans = [f"{tag}={value}" for tag, value in san_ext[:10]]
-            lines.append(f"  SAN:              {', '.join(sans)}")
-            if len(san_ext) > 10:
-                lines.append(f"                    ... and {len(san_ext) - 10} more")
+        if isinstance(san_ext, (list, tuple)):
+            show_san = san_ext[:10]
+            sans = [
+                f"{tag}={value}"
+                for entry in show_san
+                if isinstance(entry, (list, tuple)) and len(entry) == 2
+                for tag, value in [(entry[0], entry[1])]
+                if isinstance(tag, str) and isinstance(value, str)
+            ]
+            if sans:
+                lines.append(f"  SAN:              {', '.join(sans)}")
+                if len(san_ext) > 10:
+                    lines.append(f"                    ... and {len(san_ext) - 10} more")
 
-        # TLS version and cipher
         lines.append(f"  TLS Version:      {version}")
         if cipher:
             lines.append(f"  Cipher:           {cipher[0]} ({cipher[1]} bits)")

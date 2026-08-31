@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from typing import Any
 
 from sharkit.tools.base import (
     ExecutionContext,
@@ -45,10 +46,12 @@ TIMESTAMP_TAGS = {
 ALL_TAGS = GPS_TAGS | CAMERA_TAGS | TIMESTAMP_TAGS
 
 
-def _dms_to_decimal(dms_tag: object, ref_tag: object) -> float | None:
+def _dms_to_decimal(dms_tag: Any, ref_tag: Any) -> float | None:
     """Convert EXIF DMS (degrees/minutes/seconds) to decimal degrees."""
     try:
-        values = dms_tag.values
+        values = getattr(dms_tag, "values", ())
+        if not values or len(values) < 3:
+            return None
         d = float(values[0].num) / float(values[0].den)
         m = float(values[1].num) / float(values[1].den)
         s = float(values[2].num) / float(values[2].den)

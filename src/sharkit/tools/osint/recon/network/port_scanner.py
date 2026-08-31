@@ -114,7 +114,7 @@ class PortScannerTool(Tool):
         if not ports:
             return Result(success=False, error="No valid ports specified.")
 
-        open_ports: list[dict[str, object]] = []
+        open_ports: list[dict[str, int | str]] = []
         for port in ports:
             try:
                 sock = socket.create_connection((host, port), timeout=timeout)
@@ -132,8 +132,8 @@ class PortScannerTool(Tool):
 
         lines: list[str] = [f"Open ports on {host}:"]
         for entry in open_ports:
-            port = entry["port"]
-            service = entry["service"]
+            port = int(entry["port"])
+            service = str(entry["service"])
             lines.append(f"  {port:<6} {service}")
 
         lines.append(f"\n{len(open_ports)} open port(s) found.")

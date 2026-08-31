@@ -312,7 +312,7 @@ class ShowCommand(Command):
         if not all_tools:
             return "No tools available."
 
-        def matches_category(tool_path: str, tool_cls: type) -> bool:
+        def matches_category(tool_path: str, tool_cls: type[Tool]) -> bool:
             if category is None:
                 return True
 

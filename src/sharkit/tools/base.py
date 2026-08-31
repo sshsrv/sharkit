@@ -38,7 +38,7 @@ def parse_bool(value: str | None) -> bool:
 
 @dataclass(frozen=True)
 class ToolInstallSpec:
-    git_url: str
+    git_url: str | None
     requirements_file: str | None = None
     pip_args: list[str] = field(default_factory=list)
     entry: str | None = None

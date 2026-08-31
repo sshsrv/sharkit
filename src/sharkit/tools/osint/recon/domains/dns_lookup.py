@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from sharkit.network.client import HttpClient
 from sharkit.tools.base import (
@@ -93,13 +94,13 @@ class DNSLookupTool(Tool):
 
     def _query(
         self, client: HttpClient, base_url: str, domain: str, rtype: str
-    ) -> tuple[int, list[dict]]:
+    ) -> tuple[int, list[dict[str, Any]]]:
         """Query DNS and return (status, answers)."""
         url = f"{base_url}?name={domain}&type={rtype}"
         resp = client.get(url, timeout=30)
-        data = json.loads(resp.content)
-        status = data.get("Status", 0)
-        answers = data.get("Answer") or []
+        data: dict[str, Any] = json.loads(resp.content)
+        status = int(data.get("Status", 0))
+        answers: list[dict[str, Any]] = data.get("Answer") or []
         return status, answers
 
     def execute(self, context: ExecutionContext) -> Result:
@@ -115,7 +116,7 @@ class DNSLookupTool(Tool):
         client = HttpClient(headers=headers)
 
         try:
-            all_answers: list[dict] = []
+            all_answers: list[dict[str, Any]] = []
             worst_status = 0
 
             if record_type == "ALL" and provider == "cloudflare":
@@ -158,8 +159,8 @@ class DNSLookupTool(Tool):
             )
 
         # Deduplicate answers (Cloudflare ALL queries may overlap)
-        seen: set[tuple] = set()
-        unique: list[dict] = []
+        seen: set[tuple[Any, Any, Any]] = set()
+        unique: list[dict[str, Any]] = []
         for ans in all_answers:
             key = (ans.get("name"), ans.get("type"), ans.get("data"))
             if key not in seen:
