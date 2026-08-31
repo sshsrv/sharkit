@@ -121,9 +121,18 @@ def _make_tool(path: str, category: str, description: str, name: str | None = No
 
 def test_show_all_uses_single_table():
     registry = ToolRegistry()
-    registry.register_tool(_make_tool("humint/factcheck/truthcheck", "humint", "TruthCheck"), "humint/factcheck/truthcheck")
-    registry.register_tool(_make_tool("osint/recon/domains/dns_lookup", "osint.recon.dns", "DNS lookup"), "osint/recon/domains/dns_lookup")
-    registry.register_tool(_make_tool("osint/humint/social/socialscan", "osint.humint.social", "Social scan"), "osint/humint/social/socialscan")
+    registry.register_tool(
+        _make_tool("humint/factcheck/truthcheck", "humint", "TruthCheck"),
+        "humint/factcheck/truthcheck",
+    )
+    registry.register_tool(
+        _make_tool("osint/recon/domains/dns_lookup", "osint.recon.dns", "DNS lookup"),
+        "osint/recon/domains/dns_lookup",
+    )
+    registry.register_tool(
+        _make_tool("osint/humint/social/socialscan", "osint.humint.social", "Social scan"),
+        "osint/humint/social/socialscan",
+    )
 
     renderer = MockRenderer()
     context = CommandContext(
@@ -147,9 +156,18 @@ def test_show_all_uses_single_table():
 
 def test_show_humint_filters_to_humint_tools():
     registry = ToolRegistry()
-    registry.register_tool(_make_tool("humint/factcheck/truthcheck", "humint", "TruthCheck"), "humint/factcheck/truthcheck")
-    registry.register_tool(_make_tool("osint/recon/domains/dns_lookup", "osint.recon.dns", "DNS lookup"), "osint/recon/domains/dns_lookup")
-    registry.register_tool(_make_tool("osint/humint/social/socialscan", "osint.humint.social", "Social scan"), "osint/humint/social/socialscan")
+    registry.register_tool(
+        _make_tool("humint/factcheck/truthcheck", "humint", "TruthCheck"),
+        "humint/factcheck/truthcheck",
+    )
+    registry.register_tool(
+        _make_tool("osint/recon/domains/dns_lookup", "osint.recon.dns", "DNS lookup"),
+        "osint/recon/domains/dns_lookup",
+    )
+    registry.register_tool(
+        _make_tool("osint/humint/social/socialscan", "osint.humint.social", "Social scan"),
+        "osint/humint/social/socialscan",
+    )
 
     renderer = MockRenderer()
     context = CommandContext(

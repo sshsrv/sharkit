@@ -320,8 +320,7 @@ class ShowCommand(Command):
             tool_category = (tool_cls.metadata.category or "").lower()
             first_segment = tool_category.split(".")[0]
             return (
-                normalized_category == tool_category
-                or normalized_category == first_segment
+                normalized_category in (tool_category, first_segment)
                 or normalized_category in tool_category
                 or tool_path.lower().startswith(f"{normalized_category}/")
             )
