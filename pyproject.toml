@@ -1,6 +1,6 @@
 [project]
 name = "sharkit"
-version = "1.0.0"
+version = "1.0.1"
 description = "OSINT / HUMINT / GEOINT research framework"
 readme = "README.md"
 license = "MIT"
