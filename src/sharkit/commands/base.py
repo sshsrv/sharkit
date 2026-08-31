@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, ClassVar
 
 
 @dataclass
@@ -15,10 +15,10 @@ class CommandContext:
 
 class Command(ABC):
     name: str
-    aliases: list[str] = []
+    aliases: ClassVar[list[str]] = []
     description: str = ""
     usage: str = ""
-    options: list[tuple[str, str]] = []
+    options: ClassVar[list[tuple[str, str]]] = []
     notes: str = ""
 
     @abstractmethod

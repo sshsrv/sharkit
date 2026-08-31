@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 import shutil
 import textwrap
@@ -11,6 +13,7 @@ from sharkit.output.theme import (
     PINK,
     RESET,
     WHITE,
+    hex_to_ansi,
 )
 
 ANSI_RE = re.compile(r"\033\[[0-9;]*m")
@@ -157,16 +160,7 @@ class Renderer:
         self.panel("disclaimer", disclaimer, centered=True, wrap=True, wrap_width=72)
 
     def centered_box(self, content: str) -> None:
-        lines = content.splitlines()
-        content_width = max((_visible_len(line) for line in lines), default=0)
-        body_width = content_width + 2
-        box_width = body_width + 2
-        pad = max(0, (_term_width() - box_width) // 2)
-        top = f"{PINK}╭{'─' * body_width}╮{RESET}"
-        bottom = f"{PINK}╰{'─' * body_width}╯{RESET}"
-        body = [f"{PINK}│{RESET} {_center(line, content_width)} {PINK}│{RESET}" for line in lines]
-        for ln in [top, *body, bottom]:
-            print(" " * pad + ln)
+        self.panel(None, content, centered=True)
 
     def _print_centered_block(self, text: str, color: str = PINK) -> None:
         lines = text.splitlines()
@@ -242,6 +236,24 @@ class Renderer:
         lines = [f"{BOLD}{key}{RESET}  {value}" for key, value in data.items()]
         self.panel("result", "\n".join(lines))
 
+    def tool_output(
+        self,
+        data: dict[str, object],
+        tool_name: str = "output",
+        tool_color: str = GRAY,
+    ) -> None:
+        """Render tool output: dash for single-line, gutter for multi-line."""
+        text = data.get("result") or data.get("output") or ""
+        if not text:
+            return
+        lines = str(text).splitlines()
+        c = hex_to_ansi(tool_color) if tool_color.startswith("#") else tool_color
+        if len(lines) == 1:
+            print(f"{c}{BOLD}{tool_name} - {RESET}{lines[0]}")
+        else:
+            for i, line in enumerate(lines):
+                self.gutter(tool_name, line, tool_color, i == 0)
+
     def tool_info(self, metadata: dict[str, str]) -> None:
         lines = [
             f"{GRAY}{key}{RESET}  {BOLD}{value}{RESET}"
@@ -258,11 +270,20 @@ class Renderer:
         for line in lines[1:]:
             print(f"{color}{BOLD}│{RESET} {line}")
 
+    def single_line(self, message: str) -> None:
+        """Render a single-line message with dash separator."""
+        print(f"  {GRAY}-{RESET} {message}")
+
+    def dash_line(self, tag: str, message: str) -> None:
+        """Render tag - message (single-line dash format without │)."""
+        print(f"{PINK}{BOLD}{tag} - {RESET}{message}")
+
     def gutter(self, name: str, line: str, color: str, is_first: bool) -> None:
+        c = hex_to_ansi(color) if color.startswith("#") else color
         if is_first:
-            prefix = f"{RESET}{color}{BOLD}{name}{RESET} {color}{BOLD}│{RESET} "
+            prefix = f"{RESET}{c}{BOLD}{name}{RESET} {c}{BOLD}│{RESET} "
         else:
-            prefix = f"{RESET}{' ' * (len(name) + 1)}{color}{BOLD}│{RESET} "
+            prefix = f"{RESET}{' ' * (_visible_len(name) + 1)}{c}{BOLD}│{RESET} "
         print(prefix + line)
 
     def support_creator(self, author: str, tool_name: str, git_url: str) -> None:

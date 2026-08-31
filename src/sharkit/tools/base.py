@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
+
+from sharkit.exceptions import ToolError
 
 
 @dataclass(frozen=True)
@@ -29,12 +31,14 @@ def parse_bool(value: str | None) -> bool:
         return True
     if normalized in _FALSE_VALUES:
         return False
-    return False
+    raise ValueError(
+        f"Cannot parse {value!r} as boolean (expected: yes/no/true/false/1/0)"
+    )
 
 
 @dataclass(frozen=True)
 class ToolInstallSpec:
-    git_url: str
+    git_url: str | None
     requirements_file: str | None = None
     pip_args: list[str] = field(default_factory=list)
     entry: str | None = None
@@ -78,8 +82,16 @@ class Tool(ABC):
     @abstractmethod
     def get_options(self) -> dict[str, OptionDefinition]: ...
 
-    @abstractmethod
-    def set_option(self, key: str, value: str) -> None: ...
+    def set_option(self, key: str, value: str) -> None:
+        options = self.get_options()
+        opt = options.get(key)
+        if opt is None:
+            raise ToolError(f'Option "{key}" not found.')
+        if opt.choices and value not in opt.choices:
+            raise ToolError(
+                f'Value "{value}" is not in choices: {", ".join(opt.choices)}'
+            )
+        options[key] = replace(opt, value=value)
 
     @abstractmethod
     def execute(self, context: ExecutionContext) -> Result: ...

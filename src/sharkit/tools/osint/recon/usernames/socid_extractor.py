@@ -9,7 +9,6 @@ import select
 import struct
 import subprocess
 import termios
-from dataclasses import replace
 
 from sharkit.output.theme import PINK, hex_to_ansi
 from sharkit.tools.base import (
@@ -19,7 +18,6 @@ from sharkit.tools.base import (
     Tool,
     ToolInstallSpec,
     ToolMetadata,
-    parse_bool,
 )
 
 _CSI_RE = re.compile(r"\x1b\[[0-9;?]*[a-zA-Z]")
@@ -31,18 +29,18 @@ def _clean_ansi(text: str) -> str:
     return _CSI_RE.sub(lambda m: m.group(0) if m.group(0).endswith("m") else "", text)
 
 
-class SherlockTool(Tool):
+class SocidExtractorTool(Tool):
     metadata = ToolMetadata(
-        name="sherlock",
-        description="Sherlock — find usernames across 400+ social networks",
+        name="socid-extractor",
+        description="socid-extractor — extract account data from social network profiles",
         category="recon",
-        author="sherlock-project",
+        author="soxoj",
         version="0.1.0",
         safety="safe",
-        color="#4A7AFF",
+        color="#1ABC9C",
         install=ToolInstallSpec(
-            git_url="https://github.com/sherlock-project/sherlock.git",
-            pip_args=["sherlock-project"],
+            git_url="https://github.com/soxoj/socid-extractor.git",
+            pip_args=["socid-extractor"],
         ),
     )
 
@@ -50,7 +48,7 @@ class SherlockTool(Tool):
         self._options = {
             "username": OptionDefinition(
                 name="username",
-                description="Target username to hunt",
+                description="Target username to search",
                 required=True,
             ),
             "timeout": OptionDefinition(
@@ -59,39 +57,6 @@ class SherlockTool(Tool):
                 required=False,
                 default=None,
             ),
-            "output": OptionDefinition(
-                name="output",
-                description="Write results to file",
-                required=False,
-                default=None,
-            ),
-            "json": OptionDefinition(
-                name="json",
-                description="Export results as JSON",
-                required=False,
-                default=None,
-                type="bool",
-            ),
-            "csv": OptionDefinition(
-                name="csv",
-                description="Export results as CSV",
-                required=False,
-                default=None,
-                type="bool",
-            ),
-            "site": OptionDefinition(
-                name="site",
-                description="Limit to specific site(s) (comma-separated)",
-                required=False,
-                default=None,
-            ),
-            "print_found": OptionDefinition(
-                name="print_found",
-                description="Only print sites where the username was found",
-                required=False,
-                default=None,
-                type="bool",
-            ),
         }
 
     def get_metadata(self) -> ToolMetadata:
@@ -99,11 +64,6 @@ class SherlockTool(Tool):
 
     def get_options(self) -> dict[str, OptionDefinition]:
         return self._options
-
-    def set_option(self, key: str, value: str) -> None:
-        if key not in self._options:
-            raise ValueError(f'Option "{key}" not found.')
-        self._options[key] = replace(self._options[key], value=value)
 
     def execute(self, context: ExecutionContext) -> Result:
         from sharkit.tools.manager import ToolManager
@@ -121,34 +81,21 @@ class SherlockTool(Tool):
             return Result(success=False, error="Tool has no install spec.")
 
         install_dir = manager.install_path(name)
-        sherlock_bin = install_dir / "venv" / "bin" / "sherlock"
-        if not sherlock_bin.exists():
+        socid_bin = install_dir / "venv" / "bin" / "socid-extractor"
+        if not socid_bin.exists():
             return Result(
                 success=False,
-                error=f"Sherlock binary not found: {sherlock_bin}",
+                error=f"socid-extractor binary not found: {socid_bin}",
             )
 
         username = context.options.get("username") or ""
         if not username:
             return Result(success=False, error="Option 'username' is required.")
 
-        args = [username]
+        args = ["-u", username]
         timeout = context.options.get("timeout")
         if timeout:
             args.extend(["--timeout", str(timeout)])
-        output = context.options.get("output")
-        if output:
-            args.extend(["--output", str(output)])
-        if parse_bool(context.options.get("json")):
-            args.append("--json")
-        if parse_bool(context.options.get("csv")):
-            args.append("--csv")
-        site = context.options.get("site")
-        if site:
-            for s in str(site).split(","):
-                args.extend(["--site", s.strip()])
-        if parse_bool(context.options.get("print_found")):
-            args.append("--print-found")
 
         renderer = context.renderer
         master, slave = pty.openpty()
@@ -170,7 +117,7 @@ class SherlockTool(Tool):
 
         try:
             proc = subprocess.Popen(
-                [str(sherlock_bin), *args],
+                [str(socid_bin), *args],
                 stdout=slave,
                 stderr=slave,
                 stdin=subprocess.DEVNULL,
@@ -217,7 +164,9 @@ class SherlockTool(Tool):
                                     print()
                                 pending_blank = False
                             if renderer is not None:
-                                renderer.gutter(name, _clean_ansi(current), tool_color, first)
+                                renderer.gutter(
+                                    name, _clean_ansi(current), tool_color, first
+                                )
                             else:
                                 print(_clean_ansi(current))
                             first = False
@@ -230,7 +179,12 @@ class SherlockTool(Tool):
                         current += ch
         except KeyboardInterrupt:
             with contextlib.suppress(OSError):
-                proc.kill()
+                proc.terminate()
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                with contextlib.suppress(OSError):
+                    proc.kill()
             current = ""
             if renderer is not None:
                 print("\r\033[K", end="")
@@ -246,7 +200,11 @@ class SherlockTool(Tool):
                     print(_clean_ansi(current))
             with contextlib.suppress(OSError):
                 os.close(master)
-            with contextlib.suppress(OSError):
-                proc.wait()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                with contextlib.suppress(OSError):
+                    proc.kill()
+                proc.wait(timeout=2)
 
         return Result(success=True, data={})

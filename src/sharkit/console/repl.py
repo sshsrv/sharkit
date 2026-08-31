@@ -31,7 +31,7 @@ class _SharkitHistory(History):
         super().__init__()
 
     def load_history_strings(self) -> list[str]:
-        return self._manager.get_history()
+        return list(reversed(self._manager.get_history()))
 
     def store_string(self, string: str) -> None:
         self._manager.add_command(string)
@@ -108,7 +108,7 @@ class Console:
             prompt = self._prompt_renderer.tool_prompt(self._current_tool)
         else:
             prompt = self._prompt_renderer.default_prompt()
-        return self._prompt_renderer.render(prompt)
+        return self._prompt_renderer.render(prompt, tool_name=self._current_tool)
 
     def _init_session(self) -> None:
         self._prompt_renderer = PromptRenderer()
@@ -144,8 +144,6 @@ class Console:
             if not stripped:
                 continue
 
-            if not line[:1].isspace():
-                self._history_manager.add_command(stripped)
             self._session_data["history"] = self._history_manager.get_history()
 
             if not self.process_command(stripped):

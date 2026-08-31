@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from sharkit.exceptions import ConfigurationError
+
 _BASE_DIR_NAME = "sharkit"
 
 
@@ -11,7 +13,12 @@ def _get_xdg_config_home() -> Path:
     xdg = os.environ.get("XDG_CONFIG_HOME")
     if xdg:
         return Path(xdg)
-    return Path.home() / ".config"
+    try:
+        return Path.home() / ".config"
+    except RuntimeError:
+        raise ConfigurationError(
+            "Cannot determine home directory. Set XDG_CONFIG_HOME manually."
+        ) from None
 
 
 def get_config_dir() -> Path:

@@ -9,7 +9,6 @@ import select
 import struct
 import subprocess
 import termios
-from dataclasses import replace
 
 from sharkit.output.theme import PINK, hex_to_ansi
 from sharkit.tools.base import (
@@ -19,7 +18,6 @@ from sharkit.tools.base import (
     Tool,
     ToolInstallSpec,
     ToolMetadata,
-    parse_bool,
 )
 
 _CSI_RE = re.compile(r"\x1b\[[0-9;?]*[a-zA-Z]")
@@ -31,65 +29,33 @@ def _clean_ansi(text: str) -> str:
     return _CSI_RE.sub(lambda m: m.group(0) if m.group(0).endswith("m") else "", text)
 
 
-class MaigretTool(Tool):
+class PhoneInfogaTool(Tool):
     metadata = ToolMetadata(
-        name="maigret",
-        description="Maigret — username OSINT across 3000+ sites with recursive checks",
+        name="phoneinfoga",
+        description="PhoneInfoga — gather information about phone numbers",
         category="recon",
-        author="soxoj",
+        author="sundowndev",
         version="0.1.0",
         safety="safe",
-        color="#FF6B35",
+        color="#2980B9",
         install=ToolInstallSpec(
-            git_url="https://github.com/soxoj/maigret.git",
-            pip_args=["maigret"],
+            git_url="https://github.com/sundowndev/phoneinfoga.git",
+            pip_args=["phoneinfoga"],
         ),
     )
 
     def __init__(self) -> None:
         self._options = {
-            "username": OptionDefinition(
-                name="username",
-                description="Target username to hunt",
+            "number": OptionDefinition(
+                name="number",
+                description="Phone number with country code (e.g. +14155552671)",
                 required=True,
             ),
-            "timeout": OptionDefinition(
-                name="timeout",
-                description="Timeout per site in seconds",
-                required=False,
-                default=None,
-            ),
-            "output": OptionDefinition(
-                name="output",
-                description="Write results to file",
-                required=False,
-                default=None,
-            ),
-            "json": OptionDefinition(
-                name="json",
-                description="Export results as JSON",
-                required=False,
-                default=None,
-                type="bool",
-            ),
-            "csv": OptionDefinition(
-                name="csv",
-                description="Export results as CSV",
-                required=False,
-                default=None,
-                type="bool",
-            ),
-            "site": OptionDefinition(
-                name="site",
-                description="Limit to specific site(s) (comma-separated)",
-                required=False,
-                default=None,
-            ),
-            "top_sites": OptionDefinition(
-                name="top_sites",
-                description="Only check top N most popular sites",
-                required=False,
-                default=None,
+            "scan": OptionDefinition(
+                name="scan",
+                description="Scan level: basic info only or all sources",
+                required=True,
+                choices=["basic", "all"],
             ),
         }
 
@@ -98,11 +64,6 @@ class MaigretTool(Tool):
 
     def get_options(self) -> dict[str, OptionDefinition]:
         return self._options
-
-    def set_option(self, key: str, value: str) -> None:
-        if key not in self._options:
-            raise ValueError(f'Option "{key}" not found.')
-        self._options[key] = replace(self._options[key], value=value)
 
     def execute(self, context: ExecutionContext) -> Result:
         from sharkit.tools.manager import ToolManager
@@ -120,35 +81,21 @@ class MaigretTool(Tool):
             return Result(success=False, error="Tool has no install spec.")
 
         install_dir = manager.install_path(name)
-        maigret_bin = install_dir / "venv" / "bin" / "maigret"
-        if not maigret_bin.exists():
+        phoneinfoga_bin = install_dir / "venv" / "bin" / "phoneinfoga"
+        if not phoneinfoga_bin.exists():
             return Result(
                 success=False,
-                error=f"Maigret binary not found: {maigret_bin}",
+                error=f"phoneinfoga binary not found: {phoneinfoga_bin}",
             )
 
-        username = context.options.get("username") or ""
-        if not username:
-            return Result(success=False, error="Option 'username' is required.")
+        number = context.options.get("number") or ""
+        if not number:
+            return Result(success=False, error="Option 'number' is required.")
 
-        args = [username, "--no-progressbar"]
-        timeout = context.options.get("timeout")
-        if timeout:
-            args.extend(["--timeout", str(timeout)])
-        output = context.options.get("output")
-        if output:
-            args.extend(["--output", str(output)])
-        if parse_bool(context.options.get("json")):
-            args.append("--json")
-        if parse_bool(context.options.get("csv")):
-            args.append("--csv")
-        site = context.options.get("site")
-        if site:
-            for s in str(site).split(","):
-                args.extend(["--site", s.strip()])
-        top_sites = context.options.get("top_sites")
-        if top_sites:
-            args.extend(["--top-sites", str(top_sites)])
+        scan = context.options.get("scan") or "basic"
+        args = ["scan", "-n", number]
+        if scan == "all":
+            args.extend(["-s", "all"])
 
         renderer = context.renderer
         master, slave = pty.openpty()
@@ -170,7 +117,7 @@ class MaigretTool(Tool):
 
         try:
             proc = subprocess.Popen(
-                [str(maigret_bin), *args],
+                [str(phoneinfoga_bin), *args],
                 stdout=slave,
                 stderr=slave,
                 stdin=subprocess.DEVNULL,
@@ -217,7 +164,9 @@ class MaigretTool(Tool):
                                     print()
                                 pending_blank = False
                             if renderer is not None:
-                                renderer.gutter(name, _clean_ansi(current), tool_color, first)
+                                renderer.gutter(
+                                    name, _clean_ansi(current), tool_color, first
+                                )
                             else:
                                 print(_clean_ansi(current))
                             first = False
@@ -230,7 +179,12 @@ class MaigretTool(Tool):
                         current += ch
         except KeyboardInterrupt:
             with contextlib.suppress(OSError):
-                proc.kill()
+                proc.terminate()
+            try:
+                proc.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                with contextlib.suppress(OSError):
+                    proc.kill()
             current = ""
             if renderer is not None:
                 print("\r\033[K", end="")
@@ -246,7 +200,11 @@ class MaigretTool(Tool):
                     print(_clean_ansi(current))
             with contextlib.suppress(OSError):
                 os.close(master)
-            with contextlib.suppress(OSError):
-                proc.wait()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                with contextlib.suppress(OSError):
+                    proc.kill()
+                proc.wait(timeout=2)
 
         return Result(success=True, data={})

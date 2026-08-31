@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from sharkit import __version__
 from sharkit.commands.base import Command, CommandContext
+from sharkit.exceptions import CommandNotFoundError
 from sharkit.output.theme import BLUE, BOLD, GREEN, PINK, RED, RESET
 from sharkit.tools.base import Tool
 
@@ -20,6 +23,19 @@ def _normalize_bool(value: str) -> str:
     if lowered in _FALSE_VALUES:
         return "false"
     return value
+
+
+def _make_progress_callback(
+    renderer: Any, tag: str, color: str, first_progress: list[bool]
+) -> Callable[[str], None]:
+    def on_progress(msg: str) -> None:
+        if renderer is not None:
+            if first_progress[0]:
+                renderer.gutter(tag, msg, color, is_first=True)
+                first_progress[0] = False
+            else:
+                renderer.gutter(tag, msg, color, is_first=False)
+    return on_progress
 
 
 def _get_tool_instance(context: CommandContext) -> Tool | None:
@@ -70,7 +86,7 @@ class HelpCommand(Command):
             return "No command registry available."
         try:
             cmd_class = registry.get_command(name)
-        except Exception:
+        except (CommandNotFoundError, KeyError):
             return f'Command "{name}" not found.'
         if cmd_class is None:
             return f'Command "{name}" not found.'
@@ -173,7 +189,7 @@ class UseCommand(Command):
     def _log(self, context: CommandContext, message: str) -> None:
         renderer = context.session.get("renderer")
         if renderer is not None:
-            renderer.log_line("use", message)
+            renderer.dash_line("use", message)
 
     def validate_args(self, args: list[str]) -> tuple[bool, str | None]:
         if not args:
@@ -194,15 +210,9 @@ class UseCommand(Command):
                     return None
                 renderer = context.session.get("renderer")
                 first_progress = [True]
-
-                def on_progress(msg: str) -> None:
-                    if renderer is not None:
-                        tag = f"install {display}"
-                        if first_progress[0]:
-                            renderer.gutter(tag, msg, GREEN, is_first=True)
-                            first_progress[0] = False
-                        else:
-                            renderer.gutter(tag, msg, GREEN, is_first=False)
+                on_progress = _make_progress_callback(
+                    renderer, f"install {display}", GREEN, first_progress
+                )
 
                 ok, message = tool_manager.install(name, spec, on_progress=on_progress)
                 if not ok:
@@ -268,7 +278,7 @@ class InfoCommand(Command):
                 f"safety        {metadata.safety}",
             ]
             return "\n".join(lines)
-        except Exception:
+        except (CommandNotFoundError, AttributeError):
             return f"Tool: {context.current_tool}"
 
 
@@ -276,39 +286,67 @@ class ShowCommand(Command):
     name = "show"
     aliases = []
     description = "Show tools or tool options"
-    usage = "show <tools|options> [tool]"
+    usage = "show <all|osint|humint|geoint|options> [tool]"
 
     def execute(self, context: CommandContext, args: list[str]) -> str | None:
         if not args:
             if context.current_tool is not None:
                 return self._show_options(context, None)
-            return self._show_tools(context)
+            return self._show_tools(context, None)
         if args[0] == "options":
             return self._show_options(context, args[1] if len(args) > 1 else None)
-        if args[0] == "tools":
-            return self._show_tools(context)
+        if args[0] == "all":
+            return self._show_tools(context, None)
+        if args[0] in ("osint", "humint", "geoint"):
+            return self._show_tools(context, args[0])
         return f"Unknown show subcommand: {args[0]}\nUsage: {self.usage}"
 
-    def _show_tools(self, context: CommandContext) -> str | None:
+    def _show_tools(self, context: CommandContext, category: str | None) -> str | None:
         tool_registry = context.session.get("tool_registry")
         tool_manager = context.session.get("tool_manager")
         renderer = context.session.get("renderer")
         if tool_registry is None or renderer is None:
             return "Tool registry not available."
+
         all_tools = tool_registry.get_all_tools()
         if not all_tools:
             return "No tools available."
+
+        def matches_category(tool_path: str, tool_cls: type[Tool]) -> bool:
+            if category is None:
+                return True
+
+            normalized_category = category.lower()
+            tool_category = (tool_cls.metadata.category or "").lower()
+            first_segment = tool_category.split(".")[0]
+            return (
+                normalized_category in (tool_category, first_segment)
+                or normalized_category in tool_category
+                or tool_path.lower().startswith(f"{normalized_category}/")
+            )
+
+        filtered = [
+            (tool_path, tool_cls)
+            for tool_path, tool_cls in all_tools.items()
+            if matches_category(tool_path, tool_cls)
+        ]
+
+        if not filtered:
+            return f'No tools found for category "{category}".'
+
+        title = f"show > {category or 'all'}"
         rows = []
-        for tool_path, tool_cls in all_tools.items():
-            metadata = tool_cls.metadata
-            if metadata.install is None or (
-                tool_manager is not None and tool_manager.is_installed(metadata.name)
+        for tool_path, tool_cls in sorted(filtered, key=lambda item: item[0]):
+            meta = tool_cls.metadata
+            if meta.install is None or (
+                tool_manager is not None and tool_manager.is_installed(meta.name)
             ):
                 installed = f"{BOLD}{PINK}Yes{RESET}"
             else:
                 installed = ""
-            rows.append([tool_path, installed, metadata.description])
-        renderer.table("show > tools", ["Tool", "Installed", "Description"], rows)
+            rows.append([tool_path, installed, meta.description])
+
+        renderer.table(title, ["Tool", "Installed", "Description"], rows)
         return None
 
     def _show_options(self, context: CommandContext, tool_arg: str | None) -> str | None:
@@ -319,12 +357,12 @@ class ShowCommand(Command):
         if tool_arg is not None:
             tool_cls = tool_registry.get_tool(tool_arg)
             if tool_cls is None:
-                return f'Tool "{tool_arg}" not found.\nTry: show tools'
+                return f'Tool "{tool_arg}" not found.\nTry: show all'
             instance = tool_cls()
             title_tool = tool_cls.metadata.name
         else:
             if context.current_tool is None:
-                return "No tool selected. Use 'show tools' or 'use <tool>' first."
+                return "No tool selected. Use 'show all' or 'use <tool>' first."
             tool_cls = tool_registry.get_tool(context.current_tool)
             if tool_cls is None:
                 return "Current tool not found."
@@ -338,7 +376,11 @@ class ShowCommand(Command):
                 return "This tool has no options."
             rows = []
             for opt in options.values():
-                value = opt.value or opt.default or "not set"
+                value = (
+                    opt.value
+                    if opt.value is not None
+                    else (opt.default if opt.default is not None else "not set")
+                )
                 required = " (required)" if opt.required else ""
                 rows.append([opt.name, value, f"{opt.description}{required}"])
             renderer.table(
@@ -347,7 +389,7 @@ class ShowCommand(Command):
                 rows,
             )
             return None
-        except Exception:
+        except (CommandNotFoundError, KeyError, AttributeError):
             return "Could not retrieve options for tool."
 
 
@@ -374,6 +416,8 @@ class SetCommand(Command):
                 return f'Option "{key}" not found.\nAvailable options: {available}'
             option = options[key]
             raw = " ".join(args[1:])
+            if not raw and option.required:
+                return f'Option "{key}" requires a value.'
             if option.type == "bool":
                 value = _normalize_bool(raw)
             elif option.choices:
@@ -394,7 +438,7 @@ class SetCommand(Command):
                     display = tool_registry.format_display(
                         tool_registry.get_tool_path(context.current_tool),
                     )
-                renderer.log_line(f"set {display}", f"{key} = {value}")
+                renderer.dash_line(f"set {display}", f"{key} = {value}")
                 return None
             return f"Set {key} = {value}"
         except Exception as e:
@@ -452,7 +496,10 @@ class RunCommand(Command):
             return "Tool registry not available."
         try:
             options = tool_instance.get_options()
-            option_values = {k: v.value or v.default or "" for k, v in options.items()}
+            option_values = {
+                k: v.value if v.value is not None else (v.default if v.default is not None else "")
+                for k, v in options.items()
+            }
             config_dir = context.session.get("config_dir") or Path("/tmp")
             from sharkit.tools.base import ExecutionContext
 
@@ -475,7 +522,9 @@ class RunCommand(Command):
             if result.success:
                 if result.data:
                     if renderer is not None:
-                        renderer.result(result.data)
+                        tool_name = tool_instance.metadata.name
+                        tool_color = tool_instance.metadata.color or "#888888"
+                        renderer.tool_output(result.data, tool_name, tool_color)
                         return None
                     lines = [f"{key}: {value}" for key, value in result.data.items()]
                     return "\n".join(lines) if lines else "Tool executed successfully."
@@ -486,7 +535,8 @@ class RunCommand(Command):
                 renderer.error(f"Tool execution failed: {result.error}")
                 return None
             return f"Tool execution failed: {result.error}"
-        except Exception as e:
+        except (RuntimeError, ValueError, OSError) as e:
+            logging.getLogger(__name__).exception("Tool execution error")
             return f"Tool execution error: {e}"
 
 
@@ -500,7 +550,7 @@ class SearchCommand(Command):
         valid, error = self.validate_args(args)
         if not valid:
             return error
-        query = args[0].lower()
+        query = " ".join(args).lower()
         tool_registry = context.session.get("tool_registry")
         if tool_registry is None:
             return "Tool registry not available."
@@ -648,15 +698,9 @@ class InstallCommand(Command):
             return None
         renderer = context.session.get("renderer")
         first_progress = [True]
-
-        def on_progress(msg: str) -> None:
-            if renderer is not None:
-                tag = f"install {display}"
-                if first_progress[0]:
-                    renderer.gutter(tag, msg, GREEN, is_first=True)
-                    first_progress[0] = False
-                else:
-                    renderer.gutter(tag, msg, GREEN, is_first=False)
+        on_progress = _make_progress_callback(
+            renderer, f"install {display}", GREEN, first_progress
+        )
 
         install_spec = tool_cls.metadata.install
         ok, message = tool_manager.install(
@@ -706,21 +750,12 @@ class UpgradeCommand(Command):
         tool_name = tool_cls.metadata.name
         display = tool_registry.format_display(tool_registry.get_tool_path(tool_name))
         if not tool_manager.is_installed(tool_name):
-            renderer = context.session.get("renderer")
-            if renderer is not None:
-                renderer.log_line(f"upgrade {display}", "not installed (skipped)", color=BLUE)
             return None
         renderer = context.session.get("renderer")
         first_progress = [True]
-
-        def on_progress(msg: str) -> None:
-            if renderer is not None:
-                tag = f"upgrade {display}"
-                if first_progress[0]:
-                    renderer.gutter(tag, msg, BLUE, is_first=True)
-                    first_progress[0] = False
-                else:
-                    renderer.gutter(tag, msg, BLUE, is_first=False)
+        on_progress = _make_progress_callback(
+            renderer, f"upgrade {display}", BLUE, first_progress
+        )
 
         upgrade_spec = tool_cls.metadata.install
         ok, message = tool_manager.update(
@@ -768,25 +803,12 @@ class UpgradeCommand(Command):
             name = meta.name
             display = tool_registry.format_display(tool_registry.get_tool_path(name))
             if not tool_manager.is_installed(name):
-                renderer = context.session.get("renderer")
-                if renderer is not None:
-                    renderer.log_line(f"upgrade {display}", "not installed (skipped)", color=BLUE)
                 continue
             renderer = context.session.get("renderer")
             first_progress = [True]
-
-            def on_progress(
-                msg: str,
-                _first: list[bool] = first_progress,
-                _tag: str = f"upgrade {display}",
-                _renderer: Any = renderer,
-            ) -> None:
-                if _renderer is not None:
-                    if _first[0]:
-                        _renderer.gutter(_tag, msg, BLUE, is_first=True)
-                        _first[0] = False
-                    else:
-                        _renderer.gutter(_tag, msg, BLUE, is_first=False)
+            on_progress = _make_progress_callback(
+                renderer, f"upgrade {display}", BLUE, first_progress
+            )
 
             ok, message = tool_manager.update(name, spec, on_progress=on_progress)
             if renderer is not None:
